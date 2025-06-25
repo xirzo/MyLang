@@ -25,17 +25,23 @@ pub const Lexer = struct {
     read_pos: usize,
 
     pub fn init(src: []const u8) Lexer {
-        return .{
+        var l = Lexer{
             .src = src,
-            .cur_char = undefined,
+            .cur_char = 0,
             .cur_pos = 0,
             .read_pos = 1,
         };
+
+        if (l.src.len > 0) {
+            l.cur_char = l.src[0];
+        }
+
+        return l;
     }
 
     fn read_char(l: *Lexer) void {
         if (l.read_pos >= l.src.len) {
-            l.cur_char = undefined;
+            l.cur_char = 0;
             return;
         }
 
@@ -46,7 +52,7 @@ pub const Lexer = struct {
 
     fn peek_char(l: *Lexer) u8 {
         if (l.read_pos > l.src.len) {
-            return undefined;
+            return 0;
         }
 
         return l.src[l.read_pos];
@@ -61,7 +67,7 @@ pub const Lexer = struct {
     fn parse_ident(l: *Lexer) Lexeme {
         const start_index: usize = l.cur_pos;
 
-        while (!std.ascii.isAlphabetic(l.peek_char())) {
+        while (std.ascii.isAlphabetic(l.peek_char())) {
             l.read_char();
         }
 
@@ -72,6 +78,8 @@ pub const Lexer = struct {
         l.skip_whitespaces();
 
         return switch (l.peek_char()) {
+            0 => Lexeme{ .illegal = {} },
+            '=' => Lexeme{ .assign = l.peek_char() },
             ';' => Lexeme{ .semicolon = l.peek_char() },
 
             else => {
