@@ -132,4 +132,18 @@ pub const Lexer = struct {
             },
         };
     }
+
+    pub fn peek(l: *Lexer) Lexeme {
+        const cur_char: u8 = l.cur_char;
+        const cur_pos: usize = l.cur_pos;
+        const read_pos: usize = l.read_pos;
+
+        const lex: Lexeme = l.next();
+
+        l.cur_char = cur_char;
+        l.cur_pos = cur_pos;
+        l.read_pos = read_pos;
+
+        return lex;
+    }
 };
