@@ -59,7 +59,7 @@ pub const Lexer = struct {
     }
 
     fn skip_whitespaces(l: *Lexer) void {
-        while (std.ascii.isWhitespace(l.src[l.read_pos])) {
+        while (l.cur_pos < l.src.len and std.ascii.isWhitespace(l.cur_char)) {
             l.read_char();
         }
     }
@@ -67,27 +67,68 @@ pub const Lexer = struct {
     fn parse_ident(l: *Lexer) Lexeme {
         const start_index: usize = l.cur_pos;
 
-        while (std.ascii.isAlphabetic(l.peek_char())) {
+        while (l.read_pos < l.src.len and
+            (std.ascii.isAlphanumeric(l.src[l.read_pos]) or l.src[l.read_pos] == '_'))
+        {
             l.read_char();
         }
 
+        l.read_char();
+
         return Lexeme{ .ident = l.src[start_index..l.cur_pos] };
+    }
+
+    fn parse_number(l: *Lexer) Lexeme {
+        const start_index: usize = l.cur_pos;
+
+        while (l.read_pos < l.src.len and
+            (std.ascii.isDigit(l.src[l.read_pos]) or l.src[l.read_pos] == '_'))
+        {
+            l.read_char();
+        }
+
+        l.read_char();
+
+        const num: i64 = std.fmt.parseInt(i64, l.src[start_index..l.cur_pos], 10) catch |err| blk: {
+            switch (err) {
+                error.Overflow => std.log.err("parse number: overflow", .{}),
+                error.InvalidCharacter => std.log.err("parse number: invalid character", .{}),
+            }
+
+            break :blk 0;
+        };
+
+        return Lexeme{ .number = num };
     }
 
     pub fn next(l: *Lexer) Lexeme {
         l.skip_whitespaces();
 
-        return switch (l.peek_char()) {
-            0 => Lexeme{ .illegal = {} },
-            '=' => Lexeme{ .assign = l.peek_char() },
-            ';' => Lexeme{ .semicolon = l.peek_char() },
+        if (l.cur_pos >= l.src.len) {
+            return Lexeme{ .eof = 0 };
+        }
 
-            else => {
-                if (std.ascii.isAlphabetic(l.peek_char())) {
-                    return l.parse_ident();
+        return switch (l.cur_char) {
+            '=' => blk: {
+                const ch: u8 = l.cur_char;
+                l.read_char();
+                break :blk Lexeme{ .assign = ch };
+            },
+            ';' => blk: {
+                const ch: u8 = l.cur_char;
+                l.read_char();
+                break :blk Lexeme{ .semicolon = ch };
+            },
+            else => blk: {
+                if (std.ascii.isAlphabetic(l.cur_char)) {
+                    break :blk l.parse_ident();
+                }
+                if (std.ascii.isDigit(l.cur_char)) {
+                    break :blk l.parse_number();
                 }
 
-                return Lexeme{ .illegal = {} };
+                l.read_char();
+                break :blk Lexeme{ .illegal = {} };
             },
         };
     }

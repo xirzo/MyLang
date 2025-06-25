@@ -18,6 +18,8 @@ test "lex assignment" {
     for (expected.items) |exp_token| {
         const actual_token = lexer.next();
 
+        std.debug.print("{any}, {any}\n", .{ @as(std.meta.Tag(Lexeme), exp_token), @as(std.meta.Tag(Lexeme), actual_token) });
+
         try std.testing.expectEqual(@as(std.meta.Tag(Lexeme), exp_token), @as(std.meta.Tag(Lexeme), actual_token));
     }
 }
