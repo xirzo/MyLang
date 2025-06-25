@@ -14,6 +14,7 @@ test "lex assignment" {
     try expected.append(Lexeme{ .assign = '=' });
     try expected.append(Lexeme{ .number = 5 });
     try expected.append(Lexeme{ .semicolon = ';' });
+    try expected.append(Lexeme{ .eof = 0 });
 
     for (expected.items) |exp_token| {
         const actual_token = lexer.next();

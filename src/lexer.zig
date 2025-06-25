@@ -104,7 +104,7 @@ pub const Lexer = struct {
     pub fn next(l: *Lexer) Lexeme {
         l.skip_whitespaces();
 
-        if (l.cur_pos >= l.src.len) {
+        if (l.cur_pos >= l.src.len or l.cur_char == 0) {
             return Lexeme{ .eof = 0 };
         }
 
