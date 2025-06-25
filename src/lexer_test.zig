@@ -8,11 +8,16 @@ test "lex assignment" {
 
     var expected = std.ArrayList(Lexeme).init(std.testing.allocator);
     defer expected.deinit();
+
     try expected.append(Lexeme{ .ident = "int" });
     try expected.append(Lexeme{ .ident = "a" });
     try expected.append(Lexeme{ .assign = '=' });
     try expected.append(Lexeme{ .number = 5 });
     try expected.append(Lexeme{ .semicolon = ';' });
 
-    try std.testing.expectEqual(expected.getLast(), lexer.next());
+    for (expected.items) |exp_token| {
+        const actual_token = lexer.next();
+
+        try std.testing.expectEqual(@as(std.meta.Tag(Lexeme), exp_token), @as(std.meta.Tag(Lexeme), actual_token));
+    }
 }
