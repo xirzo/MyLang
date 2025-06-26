@@ -100,10 +100,14 @@ pub const Lexer = struct {
 
         l.read_char();
 
-        const num: i64 = std.fmt.parseInt(i64, l.src[start_index..l.cur_pos], 10) catch |err| blk: {
+        // maybe will cause bugs, as I am not sure that it is valid to add 1 to cur_pos
+        // but this page says that slices exclude last element
+        // https://zig.guide/language-basics/slices/
+
+        const num: i64 = std.fmt.parseInt(i64, l.src[start_index .. l.cur_pos + 1], 10) catch |err| blk: {
             switch (err) {
-                error.Overflow => std.log.err("parse number: overflow", .{}),
-                error.InvalidCharacter => std.log.err("parse number: invalid character", .{}),
+                error.Overflow => std.log.err("parse number overflow", .{}),
+                error.InvalidCharacter => std.log.err("parse number invalid character: {s}", .{l.src[start_index .. l.cur_pos + 1]}),
             }
 
             break :blk 0;
