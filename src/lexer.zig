@@ -8,6 +8,8 @@ pub const LexemeTag = enum {
     semicolon,
     plus,
     asterisk,
+    minus,
+    slash,
     eof,
 };
 
@@ -19,12 +21,16 @@ pub const Lexeme = union(LexemeTag) {
     semicolon: u8,
     plus: u8,
     asterisk: u8,
+    minus: u8,
+    slash: u8,
     eof: u8,
 
     pub fn get_binary_oper_char(self: *const Lexeme) ?u8 {
         return switch (self.*) {
             .plus => |char| char,
             .asterisk => |char| char,
+            .minus => |char| char,
+            .slash => |char| char,
             else => null,
         };
     }
@@ -151,6 +157,16 @@ pub const Lexer = struct {
                 const ch: u8 = l.cur_char;
                 l.read_char();
                 break :blk Lexeme{ .asterisk = ch };
+            },
+            '/' => blk: {
+                const ch: u8 = l.cur_char;
+                l.read_char();
+                break :blk Lexeme{ .slash = ch };
+            },
+            '-' => blk: {
+                const ch: u8 = l.cur_char;
+                l.read_char();
+                break :blk Lexeme{ .minus = ch };
             },
             else => blk: {
                 if (std.ascii.isAlphabetic(l.cur_char)) {
