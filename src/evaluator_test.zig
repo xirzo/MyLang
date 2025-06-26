@@ -26,3 +26,27 @@ test "evaluate complex arithmetic expression" {
     const result = try ast.eval();
     try std.testing.expectEqual(@as(i64, 15), result);
 }
+
+test "evaluate parentheses expression" {
+    const src = "(5 + 5) * 2";
+    const lexer: Lexer = Lexer.init(src);
+    var parser: Parser = Parser.init(lexer, std.testing.allocator);
+
+    var ast = try parser.expr();
+    defer ast.deinit(std.testing.allocator);
+
+    const result = try ast.eval();
+    try std.testing.expectEqual(@as(i64, 20), result);
+}
+
+test "evaluate substraction" {
+    const src = "0 - 5";
+    const lexer: Lexer = Lexer.init(src);
+    var parser: Parser = Parser.init(lexer, std.testing.allocator);
+
+    var ast = try parser.expr();
+    defer ast.deinit(std.testing.allocator);
+
+    const result = try ast.eval();
+    try std.testing.expectEqual(@as(i64, -5), result);
+}
