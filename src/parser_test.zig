@@ -16,7 +16,8 @@ test "parse single digit number" {
     const lexer: Lexer = Lexer.init(src);
     var parser: Parser = Parser.init(lexer, std.testing.allocator);
 
-    const ast = try parser.expr();
+    var ast = try parser.expr();
+    defer ast.deinit(std.testing.allocator);
 
     try std.testing.expectEqual(5, ast.atom.value);
 }
@@ -26,5 +27,10 @@ test "parse infix operator" {
     const lexer: Lexer = Lexer.init(src);
     var parser: Parser = Parser.init(lexer, std.testing.allocator);
 
-    _ = try parser.expr();
+    var ast = try parser.expr();
+    defer ast.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(@as(u8, '+'), ast.op.value);
+    try std.testing.expectEqual(@as(i64, 5), ast.op.lhs.*.atom.value);
+    try std.testing.expectEqual(@as(i64, 5), ast.op.rhs.*.atom.value);
 }
