@@ -6,6 +6,8 @@ pub const LexemeTag = enum {
     assign,
     number,
     semicolon,
+    plus,
+    asterisk,
     eof,
 };
 
@@ -15,7 +17,16 @@ pub const Lexeme = union(LexemeTag) {
     assign: u8,
     number: i64,
     semicolon: u8,
+    plus: u8,
+    asterisk: u8,
     eof: u8,
+
+    pub fn is_binary_oper(self: *Lexeme) bool {
+        return switch (self) {
+            .plus, .asterisk => true,
+            else => false,
+        };
+    }
 };
 
 pub const Lexer = struct {
@@ -118,6 +129,16 @@ pub const Lexer = struct {
                 const ch: u8 = l.cur_char;
                 l.read_char();
                 break :blk Lexeme{ .semicolon = ch };
+            },
+            '+' => blk: {
+                const ch: u8 = l.cur_char;
+                l.read_char();
+                break :blk Lexeme{ .plus = ch };
+            },
+            '*' => blk: {
+                const ch: u8 = l.cur_char;
+                l.read_char();
+                break :blk Lexeme{ .asterisk = ch };
             },
             else => blk: {
                 if (std.ascii.isAlphabetic(l.cur_char)) {
