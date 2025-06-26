@@ -21,10 +21,11 @@ pub const Lexeme = union(LexemeTag) {
     asterisk: u8,
     eof: u8,
 
-    pub fn is_binary_oper(self: *Lexeme) bool {
-        return switch (self) {
-            .plus, .asterisk => true,
-            else => false,
+    pub fn get_binary_oper_char(self: *const Lexeme) ?u8 {
+        return switch (self.*) {
+            .plus => |char| char,
+            .asterisk => |char| char,
+            else => null,
         };
     }
 };
@@ -92,9 +93,8 @@ pub const Lexer = struct {
     fn parse_number(l: *Lexer) Lexeme {
         const start_index: usize = l.cur_pos;
 
-        while (l.read_pos < l.src.len and
-            (std.ascii.isDigit(l.src[l.read_pos]) or l.src[l.read_pos] == '_'))
-        {
+        while (l.read_pos < l.src.len and std.ascii.isDigit(l.src[l.read_pos])) {
+            // std.debug.print("print number string loop: {c}\n", .{l.src[l.read_pos]});
             l.read_char();
         }
 
@@ -104,12 +104,18 @@ pub const Lexer = struct {
         // but this page says that slices exclude last element
         // https://zig.guide/language-basics/slices/
 
-        const num: i64 = std.fmt.parseInt(i64, l.src[start_index .. l.cur_pos + 1], 10) catch |err| blk: {
+        const num_str = switch (l.cur_pos - start_index) {
+            0 => l.src[start_index .. l.cur_pos + 1],
+            else => l.src[start_index..l.cur_pos],
+        };
+
+        std.debug.print("print number string: {s}\n", .{num_str});
+
+        const num: i64 = std.fmt.parseInt(i64, num_str, 10) catch |err| blk: {
             switch (err) {
                 error.Overflow => std.log.err("parse number overflow", .{}),
-                error.InvalidCharacter => std.log.err("parse number invalid character: {s}", .{l.src[start_index .. l.cur_pos + 1]}),
+                error.InvalidCharacter => std.log.err("parse number invalid character: {s}", .{num_str}),
             }
-
             break :blk 0;
         };
 
@@ -122,6 +128,8 @@ pub const Lexer = struct {
         if (l.cur_pos >= l.src.len or l.cur_char == 0) {
             return Lexeme{ .eof = 0 };
         }
+
+        std.debug.print("lexer next: {c}\n", .{l.cur_char});
 
         return switch (l.cur_char) {
             '=' => blk: {

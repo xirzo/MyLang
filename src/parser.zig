@@ -2,24 +2,38 @@ const std = @import("std");
 const Lexer = @import("lexer.zig").Lexer;
 const Lexeme = @import("lexer.zig").Lexeme;
 const Ast = @import("ast.zig").Ast;
+const Op = @import("ast.zig").Op;
 
 pub const Parser = struct {
     l: Lexer,
+    allocator: std.mem.Allocator,
 
-    pub fn init(l: Lexer) Parser {
+    pub fn init(l: Lexer, allocator: std.mem.Allocator) Parser {
         return Parser{
             .l = l,
+            .allocator = allocator,
         };
     }
 
-    pub fn expr(p: *Parser) Ast {
-        return p.expr_binary();
+    pub fn expr(p: *Parser) !Ast {
+        std.debug.print("expr call\n", .{});
+        return try p.expr_binary(0);
     }
 
-    fn expr_binary(p: *Parser) Ast {
+    fn infix_binding_power(op: u8) ?struct { u8, u8 } {
+        return switch (op) {
+            '+', '-' => .{ 1, 2 },
+            '*', '/' => .{ 3, 4 },
+            else => null,
+        };
+    }
+
+    fn expr_binary(p: *Parser, min_bp: u8) !Ast {
         const lex: Lexeme = p.l.next();
 
-        const lhs = switch (lex) {
+        std.debug.print("expr binary call with token {any}\n", .{@as(std.meta.Tag(Lexeme), lex)});
+
+        var lhs: Ast = switch (lex) {
             .number => |num| Ast{ .atom = .{ .value = num } },
             else => {
                 std.log.err("bad lexeme for binary expression parse {any}\n", .{@as(std.meta.Tag(Lexeme), lex)});
@@ -27,30 +41,46 @@ pub const Parser = struct {
             },
         };
 
+        while (true) {
+            const oper_lex: Lexeme = p.l.peek();
+
+            const oper_char: u8 = switch (oper_lex) {
+                .eof => break,
+                else => blk: {
+                    if (oper_lex.get_binary_oper_char()) |char| {
+                        break :blk char;
+                    }
+
+                    // not binary operator
+                    unreachable;
+                },
+            };
+
+            const bp = infix_binding_power(oper_char) orelse .{ 0, 0 };
+
+            const l_bp = bp[0];
+            const r_bp = bp[1];
+
+            if (min_bp > l_bp) {
+                break;
+            }
+
+            _ = p.l.next();
+
+            const rhs = try expr_binary(p, r_bp);
+
+            const lhs_node = try p.allocator.create(Ast);
+            lhs_node.* = lhs;
+            const rhs_node = try p.allocator.create(Ast);
+            rhs_node.* = rhs;
+
+            lhs = .{ .op = .{
+                .value = oper_char,
+                .lhs = lhs_node,
+                .rhs = rhs_node,
+            } };
+        }
+
         return lhs;
     }
-
-    // pub fn parse(p: *Parser) void {
-    //     const peeked: Lexeme = p.l.peek();
-    //     while (peeked != .eof) {
-    //         switch (peeked) {
-    //             .illegal => @panic("ILLEGAL token"),
-    //             .ident => blk: {
-    //                 break :blk;
-    //             },
-    //             .assign => blk: {
-    //                 break :blk;
-    //             },
-    //             .number => blk: {
-    //                 break :blk;
-    //             },
-    //             .semicolon => blk: {
-    //                 break :blk;
-    //             },
-    //             .eof => blk: {
-    //                 break :blk;
-    //             },
-    //         }
-    //     }
-    // }
 };

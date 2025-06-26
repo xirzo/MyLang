@@ -1,25 +1,16 @@
 const Lexeme = @import("lexer.zig").Lexeme;
 
-// Expr =
-//     Factor
-//   | Expr '+' Factor
-// Factor =
-//     Atom
-//   | Factor '*' Atom
-// Atom =
-//     'number'
-//   | '(' Expr ')'
-
 pub const Atom = struct {
     value: i64,
 };
 
-pub const Ast = union {
-    atom: Atom,
+pub const Op = struct {
+    value: u8,
+    lhs: *Ast,
+    rhs: *Ast,
 };
 
-// const BinaryExpr = struct {
-//     op: Lexeme,
-//     left: *Expr,
-//     right: *Expr,
-// };
+pub const Ast = union {
+    atom: Atom,
+    op: Op,
+};
