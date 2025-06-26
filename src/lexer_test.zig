@@ -14,7 +14,7 @@ test "lex assignment" {
     try expected.append(Lexeme{ .assign = '=' });
     try expected.append(Lexeme{ .number = 123 });
     try expected.append(Lexeme{ .semicolon = ';' });
-    try expected.append(Lexeme{ .eof = 0 });
+    try expected.append(Lexeme{ .eof = {} });
 
     for (expected.items) |exp_token| {
         const actual_token = lexer.next();
@@ -36,7 +36,7 @@ test "lex addition" {
     try expected.append(Lexeme{ .number = 5 });
     try expected.append(Lexeme{ .plus = '+' });
     try expected.append(Lexeme{ .number = 5 });
-    try expected.append(Lexeme{ .eof = 0 });
+    try expected.append(Lexeme{ .eof = {} });
 
     for (expected.items) |exp_token| {
         const actual_token = lexer.next();
@@ -56,7 +56,7 @@ test "lex multidigit number" {
     defer expected.deinit();
 
     try expected.append(Lexeme{ .number = 55 });
-    try expected.append(Lexeme{ .eof = 0 });
+    try expected.append(Lexeme{ .eof = {} });
 
     for (expected.items) |exp_token| {
         const actual_token = lexer.next();
@@ -78,7 +78,7 @@ test "lex addition no spaces" {
     try expected.append(Lexeme{ .number = 5 });
     try expected.append(Lexeme{ .plus = '+' });
     try expected.append(Lexeme{ .number = 55 });
-    try expected.append(Lexeme{ .eof = 0 });
+    try expected.append(Lexeme{ .eof = {} });
 
     for (expected.items) |exp_token| {
         const actual_token = lexer.next();
