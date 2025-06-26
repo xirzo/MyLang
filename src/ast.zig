@@ -26,4 +26,22 @@ pub const Ast = union(enum) {
             },
         }
     }
+
+    pub fn eval(self: Ast) !i64 {
+        return switch (self) {
+            .atom => |a| a.value,
+            .op => |o| {
+                const lhs = try o.lhs.eval();
+                const rhs = try o.rhs.eval();
+
+                return switch (o.value) {
+                    '+' => lhs + rhs,
+                    '-' => lhs - rhs,
+                    '*' => lhs * rhs,
+                    '/' => if (rhs == 0) error.DivisionByZero else @divTrunc(lhs, rhs),
+                    else => error.UnsupportedOperator,
+                };
+            },
+        };
+    }
 };

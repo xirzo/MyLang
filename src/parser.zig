@@ -16,7 +16,7 @@ pub const Parser = struct {
     }
 
     pub fn expr(p: *Parser) !Ast {
-        std.debug.print("expr call\n", .{});
+        // std.debug.print("expr call\n", .{});
         return try p.expr_binary(0);
     }
 
@@ -31,7 +31,7 @@ pub const Parser = struct {
     fn expr_binary(p: *Parser, min_bp: u8) !Ast {
         const lex: Lexeme = p.l.next();
 
-        std.debug.print("expr binary call with token {any}\n", .{@as(std.meta.Tag(Lexeme), lex)});
+        // std.debug.print("expr binary call with token {any}\n", .{@as(std.meta.Tag(Lexeme), lex)});
 
         var lhs: Ast = switch (lex) {
             .number => |num| Ast{ .atom = .{ .value = num } },
@@ -51,6 +51,7 @@ pub const Parser = struct {
                         break :blk char;
                     }
 
+                    std.debug.print("not binary operator: {any}\n", .{@as(std.meta.Tag(Lexeme), oper_lex)});
                     // not binary operator
                     unreachable;
                 },

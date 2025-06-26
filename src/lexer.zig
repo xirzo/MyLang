@@ -109,7 +109,7 @@ pub const Lexer = struct {
             else => l.src[start_index..l.cur_pos],
         };
 
-        std.debug.print("print number string: {s}\n", .{num_str});
+        // std.debug.print("print number string: {s}\n", .{num_str});
 
         const num: i64 = std.fmt.parseInt(i64, num_str, 10) catch |err| blk: {
             switch (err) {
@@ -129,7 +129,7 @@ pub const Lexer = struct {
             return Lexeme{ .eof = 0 };
         }
 
-        std.debug.print("lexer next: {c}\n", .{l.cur_char});
+        // std.debug.print("lexer next: {c}\n", .{l.cur_char});
 
         return switch (l.cur_char) {
             '=' => blk: {
