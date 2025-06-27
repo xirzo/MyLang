@@ -90,6 +90,32 @@ test "lex addition no spaces" {
     }
 }
 
+test "lex paren" {
+    const src = "2 * (5 + 5)";
+    var lexer: Lexer = Lexer.init(src);
+
+    var expected = std.ArrayList(Lexeme).init(std.testing.allocator);
+    defer expected.deinit();
+
+    try expected.append(Lexeme{ .number = 2 });
+    try expected.append(Lexeme{ .asterisk = '*' });
+    try expected.append(Lexeme{ .lparen = '(' });
+    try expected.append(Lexeme{ .number = 5 });
+    try expected.append(Lexeme{ .plus = '+' });
+    try expected.append(Lexeme{ .number = 5 });
+    try expected.append(Lexeme{ .rparen = ')' });
+    try expected.append(Lexeme{ .eof = {} });
+
+    for (expected.items) |exp_token| {
+        const actual_token = lexer.next();
+
+        // std.debug.print("{any}, {any}\n", .{ @as(std.meta.Tag(Lexeme), exp_token), @as(std.meta.Tag(Lexeme), actual_token) });
+
+        try std.testing.expectEqual(@as(std.meta.Tag(Lexeme), exp_token), @as(std.meta.Tag(Lexeme), actual_token));
+        try expect_lexeme_equal(exp_token, actual_token);
+    }
+}
+
 fn expect_lexeme_equal(expected: Lexeme, actual: Lexeme) !void {
     const tag_expected = @as(std.meta.Tag(Lexeme), expected);
     const tag_actual = @as(std.meta.Tag(Lexeme), actual);
