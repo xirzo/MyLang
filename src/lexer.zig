@@ -1,19 +1,6 @@
 const std = @import("std");
 
-pub const LexemeTag = enum {
-    illegal,
-    ident,
-    assign,
-    number,
-    semicolon,
-    plus,
-    asterisk,
-    minus,
-    slash,
-    eof,
-};
-
-pub const Lexeme = union(LexemeTag) {
+pub const Lexeme = union(enum) {
     illegal: void,
     ident: []const u8,
     assign: u8,
@@ -23,6 +10,8 @@ pub const Lexeme = union(LexemeTag) {
     asterisk: u8,
     minus: u8,
     slash: u8,
+    lparen: u8,
+    rparen: u8,
     eof: void,
 
     pub fn get_binary_oper_char(lex: *const Lexeme) ?u8 {
@@ -116,6 +105,8 @@ pub const Lexer = struct {
             ';' => Lexeme{ .semicolon = l.cur_char },
             '*' => Lexeme{ .asterisk = l.cur_char },
             '/' => Lexeme{ .slash = l.cur_char },
+            '(' => Lexeme{ .lparen = l.cur_char },
+            ')' => Lexeme{ .rparen = l.cur_char },
             0 => Lexeme{ .eof = {} },
             else => blk: {
                 if (Lexer.is_letter(l.cur_char)) {

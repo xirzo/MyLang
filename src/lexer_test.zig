@@ -105,6 +105,8 @@ fn expect_lexeme_equal(expected: Lexeme, actual: Lexeme) !void {
         .minus => try std.testing.expectEqual(expected.minus, actual.minus),
         .slash => try std.testing.expectEqual(expected.slash, actual.slash),
         .eof => try std.testing.expectEqual(expected.eof, actual.eof),
+        .lparen => try std.testing.expectEqual(expected.lparen, actual.lparen),
+        .rparen => try std.testing.expectEqual(expected.rparen, actual.rparen),
         .illegal => {},
     }
 }
