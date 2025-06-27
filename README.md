@@ -5,8 +5,8 @@ This is a simple interpreter written in [Zig](https://ziglang.org) in order to l
 ### Parsing
 
 - [] parse statements
-- [] parse prefix operators
-- [] parse postfix operators
+- [x] parse prefix operators
+- [x] parse postfix operators
 
 ### Evaluation
 
