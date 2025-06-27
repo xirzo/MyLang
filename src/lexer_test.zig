@@ -116,6 +116,28 @@ test "lex paren" {
     }
 }
 
+
+test "lex factorial" {
+    const src = "5!";
+    var lexer: Lexer = Lexer.init(src);
+
+    var expected = std.ArrayList(Lexeme).init(std.testing.allocator);
+    defer expected.deinit();
+
+    try expected.append(Lexeme{ .number = 5 });
+    try expected.append(Lexeme{ .bang = '!' });
+    try expected.append(Lexeme{ .eof = {} });
+
+    for (expected.items) |exp_token| {
+        const actual_token = lexer.next();
+
+        // std.debug.print("{any}, {any}\n", .{ @as(std.meta.Tag(Lexeme), exp_token), @as(std.meta.Tag(Lexeme), actual_token) });
+
+        try std.testing.expectEqual(@as(std.meta.Tag(Lexeme), exp_token), @as(std.meta.Tag(Lexeme), actual_token));
+        try expect_lexeme_equal(exp_token, actual_token);
+    }
+}
+
 fn expect_lexeme_equal(expected: Lexeme, actual: Lexeme) !void {
     const tag_expected = @as(std.meta.Tag(Lexeme), expected);
     const tag_actual = @as(std.meta.Tag(Lexeme), actual);
@@ -133,6 +155,7 @@ fn expect_lexeme_equal(expected: Lexeme, actual: Lexeme) !void {
         .eof => try std.testing.expectEqual(expected.eof, actual.eof),
         .lparen => try std.testing.expectEqual(expected.lparen, actual.lparen),
         .rparen => try std.testing.expectEqual(expected.rparen, actual.rparen),
+        .bang => try std.testing.expectEqual(expected.bang, actual.bang),
         .illegal => {},
     }
 }

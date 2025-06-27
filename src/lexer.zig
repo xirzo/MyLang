@@ -12,14 +12,16 @@ pub const Lexeme = union(enum) {
     slash: u8,
     lparen: u8,
     rparen: u8,
+    bang: u8,
     eof: void,
 
-    pub fn get_binary_oper_char(lex: *const Lexeme) ?u8 {
+    pub fn get_oper_char(lex: *const Lexeme) ?u8 {
         return switch (lex.*) {
             .plus => |char| char,
             .asterisk => |char| char,
             .minus => |char| char,
             .slash => |char| char,
+            .bang => |char| char,
             else => null,
         };
     }
@@ -107,6 +109,7 @@ pub const Lexer = struct {
             '/' => Lexeme{ .slash = l.cur_char },
             '(' => Lexeme{ .lparen = l.cur_char },
             ')' => Lexeme{ .rparen = l.cur_char },
+            '!' => Lexeme{ .bang = l.cur_char },
             0 => Lexeme{ .eof = {} },
             else => blk: {
                 if (Lexer.is_letter(l.cur_char)) {
