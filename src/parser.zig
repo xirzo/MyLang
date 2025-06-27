@@ -2,6 +2,7 @@ const std = @import("std");
 const Lexer = @import("lexer.zig").Lexer;
 const Lexeme = @import("lexer.zig").Lexeme;
 const Ast = @import("ast.zig").Ast;
+const assert = std.debug.assert;
 const Op = @import("ast.zig").Op;
 
 pub const Parser = struct {
@@ -49,6 +50,11 @@ pub const Parser = struct {
 
         var lhs: Ast = switch (lex) {
             .number => |num| Ast{ .atom = .{ .value = num } },
+            .lparen => blk: {
+                    const lhs: Ast = try p.expr(0);
+                    assert(p.l.next() == .rparen);
+                    break :blk lhs;
+               },
             else => blk: {
                 if (lex.get_oper_char()) |char| {
                     if (prefix_binding_power(char)) |r_bp| {

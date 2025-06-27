@@ -86,3 +86,107 @@ test "parse factorial" {
 
     try std.testing.expectEqual(@as(i64, 5), inner.atom.value);
 }
+
+test "parse paren" {
+    const src = "(5)";
+    const lexer: Lexer = Lexer.init(src);
+    var parser: Parser = Parser.init(lexer, std.testing.allocator);
+
+    var ast = try parser.parse_expr();
+    defer ast.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(@as(u8, '('), ast.op.value);
+    try std.testing.expect(ast.op.rhs == null);
+
+    const inner_ptr = ast.op.lhs.?;
+    const inner = inner_ptr.*;
+
+    try std.testing.expectEqual(@as(i64, 5), inner.atom.value);
+}
+
+test "parse paren with prefix" {
+    const src = "(-5)";
+    const lexer: Lexer = Lexer.init(src);
+    var parser: Parser = Parser.init(lexer, std.testing.allocator);
+
+    var ast = try parser.parse_expr();
+    defer ast.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(@as(u8, '('), ast.op.value);
+    try std.testing.expect(ast.op.rhs == null);
+
+    const inner_ptr = ast.op.lhs.?;
+    const inner = inner_ptr.*;
+    try std.testing.expectEqual(@as(u8, '-'), inner.op.value);
+    try std.testing.expect(inner.op.lhs == null);
+
+    const atom_ptr = inner.op.rhs.?;
+    const atom = atom_ptr.*;
+    try std.testing.expectEqual(@as(i64, 5), atom.atom.value);
+}
+
+test "parse paren with infix" {
+    const src = "(1 + 2)";
+    const lexer: Lexer = Lexer.init(src);
+    var parser: Parser = Parser.init(lexer, std.testing.allocator);
+
+    var ast = try parser.parse_expr();
+    defer ast.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(@as(u8, '('), ast.op.value);
+    try std.testing.expect(ast.op.rhs == null);
+
+    const inner_ptr = ast.op.lhs.?;
+    const inner = inner_ptr.*;
+    try std.testing.expectEqual(@as(u8, '+'), inner.op.value);
+
+    const lhs_ptr = inner.op.lhs.?;
+    const lhs = lhs_ptr.*;
+    try std.testing.expectEqual(@as(i64, 1), lhs.atom.value);
+
+    const rhs_ptr = inner.op.rhs.?;
+    const rhs = rhs_ptr.*;
+    try std.testing.expectEqual(@as(i64, 2), rhs.atom.value);
+}
+
+test "parse nested paren" {
+    const src = "((5))";
+    const lexer: Lexer = Lexer.init(src);
+    var parser: Parser = Parser.init(lexer, std.testing.allocator);
+
+    var ast = try parser.parse_expr();
+    defer ast.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(@as(u8, '('), ast.op.value);
+    try std.testing.expect(ast.op.rhs == null);
+
+    const inner_ptr = ast.op.lhs.?;
+    const inner = inner_ptr.*;
+    try std.testing.expectEqual(@as(u8, '('), inner.op.value);
+    try std.testing.expect(inner.op.rhs == null);
+
+    const inner_inner_ptr = inner.op.lhs.?;
+    const inner_inner = inner_inner_ptr.*;
+    try std.testing.expectEqual(@as(i64, 5), inner_inner.atom.value);
+}
+
+test "parse paren with postfix" {
+    const src = "(5!)";
+    const lexer: Lexer = Lexer.init(src);
+    var parser: Parser = Parser.init(lexer, std.testing.allocator);
+
+    var ast = try parser.parse_expr();
+    defer ast.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(@as(u8, '('), ast.op.value);
+    try std.testing.expect(ast.op.rhs == null);
+
+    const inner_ptr = ast.op.lhs.?;
+    const inner = inner_ptr.*;
+    try std.testing.expectEqual(@as(u8, '!'), inner.op.value);
+    try std.testing.expect(inner.op.rhs == null);
+
+    const atom_ptr = inner.op.lhs.?;
+    const atom = atom_ptr.*;
+    try std.testing.expectEqual(@as(i64, 5), atom.atom.value);
+}
