@@ -42,9 +42,21 @@ pub const Parser = struct {
 
         var lhs: Ast = switch (lex) {
             .number => |num| Ast{ .atom = .{ .value = num } },
-            else => {
-                std.log.err("bad lexeme for binary expression parse {any}\n", .{@as(std.meta.Tag(Lexeme), lex)});
-                unreachable;
+            else => blk: {
+                if (lex.get_binary_oper_char()) |char| {
+                    if (prefix_binding_power(char)) |r_bp| {
+                        const rhs = try p.expr(r_bp);
+                        const rhs_node = try p.allocator.create(Ast);
+                        rhs_node.* = rhs;
+                        break :blk Ast{ .op = .{ .lhs = null, .rhs = rhs_node, .value = char } };
+                    } else {
+                        std.log.err("operator cannot be used as prefix {any}\n", .{@as(std.meta.Tag(Lexeme), lex)});
+                        unreachable;
+                    }
+                } else {
+                    std.log.err("bad lexeme for binary expression parse {any}\n", .{@as(std.meta.Tag(Lexeme), lex)});
+                    unreachable;
+                }
             },
         };
 

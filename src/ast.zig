@@ -7,22 +7,28 @@ pub const Atom = struct {
 
 pub const Op = struct {
     value: u8,
-    lhs: *Ast,
-    rhs: *Ast,
+    lhs: ?*Ast,
+    rhs: ?*Ast,
 };
 
 pub const Ast = union(enum) {
     atom: Atom,
     op: Op,
 
-    pub fn deinit(self: Ast, allocator: std.mem.Allocator) void {
-        switch (self) {
+    pub fn deinit(self: ?Ast, allocator: std.mem.Allocator) void {
+        if (self == null) return;
+
+        switch (self.?) {
             .atom => {},
             .op => |op| {
-                op.lhs.deinit(allocator);
-                op.rhs.deinit(allocator);
-                allocator.destroy(op.lhs);
-                allocator.destroy(op.rhs);
+                if (op.lhs) |lhs| {
+                    lhs.deinit(allocator);
+                    allocator.destroy(lhs);
+                }
+                if (op.rhs) |rhs| {
+                    rhs.deinit(allocator);
+                    allocator.destroy(rhs);
+                }
             },
         }
     }
