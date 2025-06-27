@@ -48,3 +48,24 @@ test "parse prefix minus" {
     try std.testing.expect(ast.op.lhs == null);
     try std.testing.expectEqual(@as(i64, 5), ast.op.rhs.?.*.atom.value);
 }
+
+test "parse double prefix minus" {
+    const src = "--5";
+    const lexer: Lexer = Lexer.init(src);
+    var parser: Parser = Parser.init(lexer, std.testing.allocator);
+
+    var ast = try parser.parse_expr();
+    defer ast.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(@as(u8, '-'), ast.op.value);
+    try std.testing.expect(ast.op.lhs == null);
+
+    const inner_ptr = ast.op.rhs.?;
+    const inner = inner_ptr.*;
+    try std.testing.expectEqual(@as(u8, '-'), inner.op.value);
+    try std.testing.expect(inner.op.lhs == null);
+
+    const atom_ptr = inner.op.rhs.?;
+    const atom = atom_ptr.*;
+    try std.testing.expectEqual(@as(i64, 5), atom.atom.value);
+}
