@@ -69,3 +69,20 @@ test "parse double prefix minus" {
     const atom = atom_ptr.*;
     try std.testing.expectEqual(@as(i64, 5), atom.atom.value);
 }
+
+test "parse factorial" {
+    const src = "5!";
+    const lexer: Lexer = Lexer.init(src);
+    var parser: Parser = Parser.init(lexer, std.testing.allocator);
+
+    var ast = try parser.parse_expr();
+    defer ast.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(@as(u8, '!'), ast.op.value);
+    try std.testing.expect(ast.op.rhs == null);
+
+    const inner_ptr = ast.op.lhs.?;
+    const inner = inner_ptr.*;
+
+    try std.testing.expectEqual(@as(i64, 5), inner.atom.value);
+}

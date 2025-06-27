@@ -35,6 +35,13 @@ pub const Parser = struct {
         };
     }
 
+    fn postfix_binding_power(op: u8) ?u8 {
+        return switch (op) {
+            '!' => 7,
+            else => null,
+        };
+    }
+
     fn expr(p: *Parser, min_bp: u8) !Ast {
         const lex: Lexeme = p.l.next();
 
@@ -43,7 +50,7 @@ pub const Parser = struct {
         var lhs: Ast = switch (lex) {
             .number => |num| Ast{ .atom = .{ .value = num } },
             else => blk: {
-                if (lex.get_binary_oper_char()) |char| {
+                if (lex.get_oper_char()) |char| {
                     if (prefix_binding_power(char)) |r_bp| {
                         const rhs = try p.expr(r_bp);
                         const rhs_node = try p.allocator.create(Ast);
@@ -66,15 +73,27 @@ pub const Parser = struct {
             const oper_char: u8 = switch (oper_lex) {
                 .eof => break,
                 else => blk: {
-                    if (oper_lex.get_binary_oper_char()) |char| {
+                    if (oper_lex.get_oper_char()) |char| {
                         break :blk char;
                     }
 
-                    std.debug.print("not binary operator: {any}\n", .{@as(std.meta.Tag(Lexeme), oper_lex)});
-                    // not binary operator
+                    std.debug.print("not an operator: {any}\n", .{@as(std.meta.Tag(Lexeme), oper_lex)});
                     unreachable;
                 },
             };
+
+            if (postfix_binding_power(oper_char)) |l_bp| {
+                if (min_bp > l_bp) {
+                    break;
+                }
+
+                _ = p.l.next();
+
+                const lhs_node = try p.allocator.create(Ast);
+                lhs_node.* = lhs;
+                lhs = Ast{ .op = .{ .lhs = lhs_node, .rhs = null, .value = oper_char } };
+                continue;
+            }
 
             const bp = infix_binding_power(oper_char) orelse .{ 0, 0 };
 
