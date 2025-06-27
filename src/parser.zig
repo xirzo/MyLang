@@ -15,9 +15,16 @@ pub const Parser = struct {
         };
     }
 
-    pub fn expr(p: *Parser) !Ast {
+    pub fn parse_expr(p: *Parser) !Ast {
         // std.debug.print("expr call\n", .{});
-        return try p.expr_binary(0);
+        return try p.expr(0);
+    }
+
+    fn prefix_binding_power(op: u8) ?u8 {
+        return switch (op) {
+            '+', '-' => 5,
+            else => null,
+        };
     }
 
     fn infix_binding_power(op: u8) ?struct { u8, u8 } {
@@ -28,7 +35,7 @@ pub const Parser = struct {
         };
     }
 
-    fn expr_binary(p: *Parser, min_bp: u8) !Ast {
+    fn expr(p: *Parser, min_bp: u8) !Ast {
         const lex: Lexeme = p.l.next();
 
         // std.debug.print("expr binary call with token {any}\n", .{@as(std.meta.Tag(Lexeme), lex)});
@@ -68,7 +75,7 @@ pub const Parser = struct {
 
             _ = p.l.next();
 
-            const rhs = try expr_binary(p, r_bp);
+            const rhs = try expr(p, r_bp);
 
             const lhs_node = try p.allocator.create(Ast);
             lhs_node.* = lhs;
