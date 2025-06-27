@@ -78,14 +78,11 @@ pub const Parser = struct {
 
             const oper_char: u8 = switch (oper_lex) {
                 .eof => break,
-                else => blk: {
-                    if (oper_lex.get_oper_char()) |char| {
-                        break :blk char;
-                    }
-
-                    std.debug.print("not an operator: {any}\n", .{@as(std.meta.Tag(Lexeme), oper_lex)});
-                    unreachable;
-                },
+                    else => blk: {
+                        const maybe_char = oper_lex.get_oper_char();
+                        if (maybe_char == null) break;
+                        break :blk maybe_char.?;
+                    },
             };
 
             if (postfix_binding_power(oper_char)) |l_bp| {
@@ -101,29 +98,35 @@ pub const Parser = struct {
                 continue;
             }
 
-            const bp = infix_binding_power(oper_char) orelse .{ 0, 0 };
+            if (infix_binding_power(oper_char)) |bp| {
+                const l_bp = bp[0];
+                const r_bp = bp[1];
 
-            const l_bp = bp[0];
-            const r_bp = bp[1];
+                if (min_bp > l_bp) {
+                    break;
+                }
 
-            if (min_bp > l_bp) {
-                break;
+                _ = p.l.next();
+
+                const rhs = try expr(p, r_bp);
+
+                const lhs_node = try p.allocator.create(Ast);
+                lhs_node.* = lhs;
+                const rhs_node = try p.allocator.create(Ast);
+                rhs_node.* = rhs;
+
+                lhs = .{ 
+                    .op = .{
+                        .value = oper_char,
+                        .lhs = lhs_node,
+                        .rhs = rhs_node,
+                    },
+                };
+
+                continue;
             }
 
-            _ = p.l.next();
-
-            const rhs = try expr(p, r_bp);
-
-            const lhs_node = try p.allocator.create(Ast);
-            lhs_node.* = lhs;
-            const rhs_node = try p.allocator.create(Ast);
-            rhs_node.* = rhs;
-
-            lhs = .{ .op = .{
-                .value = oper_char,
-                .lhs = lhs_node,
-                .rhs = rhs_node,
-            } };
+            break;
         }
 
         return lhs;

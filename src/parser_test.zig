@@ -4,14 +4,6 @@ const Lexeme = @import("lexer.zig").Lexeme;
 const Parser = @import("parser.zig").Parser;
 const a = @import("ast.zig");
 
-// test "parse assignment" {
-//     const src = "int a = 5;";
-//     const lexer: Lexer = Lexer.init(src);
-//     var parser: Parser = Parser.init(lexer);
-//
-//     parser.parse();
-// }
-
 test "parse single digit number" {
     const src = "5";
     const lexer: Lexer = Lexer.init(src);
@@ -87,6 +79,7 @@ test "parse factorial" {
     try std.testing.expectEqual(@as(i64, 5), inner.atom.value);
 }
 
+
 test "parse paren" {
     const src = "(5)";
     const lexer: Lexer = Lexer.init(src);
@@ -95,13 +88,7 @@ test "parse paren" {
     var ast = try parser.parse_expr();
     defer ast.deinit(std.testing.allocator);
 
-    try std.testing.expectEqual(@as(u8, '('), ast.op.value);
-    try std.testing.expect(ast.op.rhs == null);
-
-    const inner_ptr = ast.op.lhs.?;
-    const inner = inner_ptr.*;
-
-    try std.testing.expectEqual(@as(i64, 5), inner.atom.value);
+    try std.testing.expectEqual(@as(i64, 5), ast.atom.value);
 }
 
 test "parse paren with prefix" {
@@ -112,15 +99,10 @@ test "parse paren with prefix" {
     var ast = try parser.parse_expr();
     defer ast.deinit(std.testing.allocator);
 
-    try std.testing.expectEqual(@as(u8, '('), ast.op.value);
-    try std.testing.expect(ast.op.rhs == null);
+    try std.testing.expectEqual(@as(u8, '-'), ast.op.value);
+    try std.testing.expect(ast.op.lhs == null);
 
-    const inner_ptr = ast.op.lhs.?;
-    const inner = inner_ptr.*;
-    try std.testing.expectEqual(@as(u8, '-'), inner.op.value);
-    try std.testing.expect(inner.op.lhs == null);
-
-    const atom_ptr = inner.op.rhs.?;
+    const atom_ptr = ast.op.rhs.?;
     const atom = atom_ptr.*;
     try std.testing.expectEqual(@as(i64, 5), atom.atom.value);
 }
@@ -133,18 +115,13 @@ test "parse paren with infix" {
     var ast = try parser.parse_expr();
     defer ast.deinit(std.testing.allocator);
 
-    try std.testing.expectEqual(@as(u8, '('), ast.op.value);
-    try std.testing.expect(ast.op.rhs == null);
+    try std.testing.expectEqual(@as(u8, '+'), ast.op.value);
 
-    const inner_ptr = ast.op.lhs.?;
-    const inner = inner_ptr.*;
-    try std.testing.expectEqual(@as(u8, '+'), inner.op.value);
-
-    const lhs_ptr = inner.op.lhs.?;
+    const lhs_ptr = ast.op.lhs.?;
     const lhs = lhs_ptr.*;
     try std.testing.expectEqual(@as(i64, 1), lhs.atom.value);
 
-    const rhs_ptr = inner.op.rhs.?;
+    const rhs_ptr = ast.op.rhs.?;
     const rhs = rhs_ptr.*;
     try std.testing.expectEqual(@as(i64, 2), rhs.atom.value);
 }
@@ -157,17 +134,7 @@ test "parse nested paren" {
     var ast = try parser.parse_expr();
     defer ast.deinit(std.testing.allocator);
 
-    try std.testing.expectEqual(@as(u8, '('), ast.op.value);
-    try std.testing.expect(ast.op.rhs == null);
-
-    const inner_ptr = ast.op.lhs.?;
-    const inner = inner_ptr.*;
-    try std.testing.expectEqual(@as(u8, '('), inner.op.value);
-    try std.testing.expect(inner.op.rhs == null);
-
-    const inner_inner_ptr = inner.op.lhs.?;
-    const inner_inner = inner_inner_ptr.*;
-    try std.testing.expectEqual(@as(i64, 5), inner_inner.atom.value);
+    try std.testing.expectEqual(@as(i64, 5), ast.atom.value);
 }
 
 test "parse paren with postfix" {
@@ -178,15 +145,10 @@ test "parse paren with postfix" {
     var ast = try parser.parse_expr();
     defer ast.deinit(std.testing.allocator);
 
-    try std.testing.expectEqual(@as(u8, '('), ast.op.value);
+    try std.testing.expectEqual(@as(u8, '!'), ast.op.value);
     try std.testing.expect(ast.op.rhs == null);
 
     const inner_ptr = ast.op.lhs.?;
     const inner = inner_ptr.*;
-    try std.testing.expectEqual(@as(u8, '!'), inner.op.value);
-    try std.testing.expect(inner.op.rhs == null);
-
-    const atom_ptr = inner.op.lhs.?;
-    const atom = atom_ptr.*;
-    try std.testing.expectEqual(@as(i64, 5), atom.atom.value);
+    try std.testing.expectEqual(@as(i64, 5), inner.atom.value);
 }
