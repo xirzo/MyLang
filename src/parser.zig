@@ -41,7 +41,7 @@ pub const Parser = struct {
             '!' => 7,
             else => null,
         };
-    }
+    
 
     fn expr(p: *Parser, min_bp: u8) !Ast {
         const lex: Lexeme = p.l.next();
@@ -131,4 +131,10 @@ pub const Parser = struct {
 
         return lhs;
     }
+
+    // int a = 5;
+
+    // fn stmt(p: *Parser, min_bp: u8) !Ast {
+    //     const lex: Lexeme = p.l.next();
+    // }
 };
