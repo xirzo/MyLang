@@ -41,7 +41,7 @@ pub const Parser = struct {
             '!' => 7,
             else => null,
         };
-    
+    }
 
     fn expr(p: *Parser, min_bp: u8) !Ast {
         const lex: Lexeme = p.l.next();
@@ -51,10 +51,10 @@ pub const Parser = struct {
         var lhs: Ast = switch (lex) {
             .number => |num| Ast{ .atom = .{ .value = num } },
             .lparen => blk: {
-                    const lhs: Ast = try p.expr(0);
-                    assert(p.l.next() == .rparen);
-                    break :blk lhs;
-               },
+                const lhs: Ast = try p.expr(0);
+                assert(p.l.next() == .rparen);
+                break :blk lhs;
+            },
             else => blk: {
                 if (lex.get_oper_char()) |char| {
                     if (prefix_binding_power(char)) |r_bp| {
@@ -78,11 +78,11 @@ pub const Parser = struct {
 
             const oper_char: u8 = switch (oper_lex) {
                 .eof => break,
-                    else => blk: {
-                        const maybe_char = oper_lex.get_oper_char();
-                        if (maybe_char == null) break;
-                        break :blk maybe_char.?;
-                    },
+                else => blk: {
+                    const maybe_char = oper_lex.get_oper_char();
+                    if (maybe_char == null) break;
+                    break :blk maybe_char.?;
+                },
             };
 
             if (postfix_binding_power(oper_char)) |l_bp| {
@@ -115,7 +115,7 @@ pub const Parser = struct {
                 const rhs_node = try p.allocator.create(Ast);
                 rhs_node.* = rhs;
 
-                lhs = .{ 
+                lhs = .{
                     .op = .{
                         .value = oper_char,
                         .lhs = lhs_node,

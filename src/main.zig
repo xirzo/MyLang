@@ -4,32 +4,35 @@ const Lexeme = @import("lexer.zig").Lexeme;
 const Parser = @import("parser.zig").Parser;
 
 pub fn main() !void {
+    var input_buffer: [1024]u8 = undefined;
+    var output_buffer: [1024]u8 = undefined;
     const allocator = std.heap.page_allocator;
-    const stdin = std.io.getStdIn().reader();
-    const stdout = std.io.getStdOut().writer();
+    const stdin = std.fs.File.stdin();
+    const stdout = std.fs.File.stdout();
+    var out_writer = stdout.writer(&output_buffer);
 
     while (true) {
-        const buf: []u8 = try allocator.alloc(u8, 1024);
-        defer allocator.free(buf);
+        const input_size = try stdin.read(&input_buffer);
 
-        if (try stdin.readUntilDelimiterOrEof(buf, '\n')) |input| {
-            if (input.len == 0) continue;
-
-            const lexer: Lexer = Lexer.init(input);
-            var parser: Parser = Parser.init(lexer, allocator);
-
-            var ast = parser.parse_expr() catch {
-                try stdout.print("Command does not exist\n", .{});
-                continue;
-            };
-
-            defer ast.deinit(allocator);
-
-            const value = try ast.eval();
-
-            try stdout.print("{d}\n", .{value});
-        } else {
-            break;
+        if (input_size == 0) {
+            continue;
         }
+
+        const input = input_buffer[0..input_size];
+
+        const lexer: Lexer = Lexer.init(input);
+        var parser: Parser = Parser.init(lexer, allocator);
+
+        var ast = parser.parse_expr() catch {
+            try stdout.writeAll("Command does not exist\n");
+            continue;
+        };
+
+        defer ast.deinit(allocator);
+
+        const value = try ast.eval();
+
+        try out_writer.interface.print("{d}\n", .{value});
+        try out_writer.interface.flush();
     }
 }
