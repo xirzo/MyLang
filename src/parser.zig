@@ -10,22 +10,16 @@ const BinaryOperator = @import("expression.zig").BinaryOperator;
 pub const Parser = struct {
     lexer: Lexer,
     allocator: std.mem.Allocator,
-    program: Program,
 
     pub fn init(l: Lexer, allocator: std.mem.Allocator) Parser {
         return Parser{
             .lexer = l,
             .allocator = allocator,
-            .program = Program.init(allocator),
         };
     }
 
-    pub fn deinit(self: *Parser) void {
-        self.program.deinit();
-    }
-
-    pub fn parse(p: *Parser) !void {
-        p.program = Program.init(p.allocator);
+    pub fn parse(p: *Parser) !Program {
+        var program = Program.init(p.allocator);
 
         while (true) {
             const tok = p.lexer.peek();
@@ -40,7 +34,7 @@ pub const Parser = struct {
             }
 
             if (try p.parse_statement()) |stmt| {
-                try p.program.statements.append(stmt);
+                try program.statements.append(stmt);
             } else {
                 _ = p.lexer.next();
             }
@@ -51,6 +45,8 @@ pub const Parser = struct {
                 _ = p.lexer.next();
             }
         }
+
+        return program;
     }
 
     pub fn parse_expression(p: *Parser) !*Expression {

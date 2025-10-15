@@ -7,13 +7,13 @@ test "assign number to a variable" {
     const src = "let x = 5;";
     const lexer: Lexer = Lexer.init(src);
     var parser: Parser = Parser.init(lexer, std.testing.allocator);
-    defer parser.deinit();
 
-    try parser.parse();
+    var program = try parser.parse();
+    defer program.deinit();
 
-    try parser.program.execute();
+    try program.execute();
 
-    const value = parser.program.environment.get("x") orelse {
+    const value = program.environment.get("x") orelse {
         std.debug.print("Variable 'x' not found in environment\n", .{});
         return error.TestExpectedEqual;
     };
