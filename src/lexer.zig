@@ -4,7 +4,7 @@ pub const Lexeme = union(enum) {
     illegal: void,
     ident: []const u8,
     assign: u8,
-    number: i64,
+    number: f64,
     semicolon: u8,
     plus: u8,
     asterisk: u8,
@@ -118,7 +118,7 @@ pub const Lexer = struct {
                     return lexeme;
                 } else if (Lexer.is_digit(l.cur_char)) {
                     const num_str = l.parse_number();
-                    const num = std.fmt.parseInt(i64, num_str, 10) catch 0;
+                    const num = std.fmt.parseFloat(f64, num_str) catch 0;
                     const lexeme = Lexeme{ .number = num };
                     return lexeme;
                 } else {

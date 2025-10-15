@@ -2,7 +2,7 @@ const std = @import("std");
 const Lexeme = @import("lexer.zig").Lexeme;
 
 pub const Atom = struct {
-    value: i64,
+    value: f64,
 };
 
 pub const Op = struct {
@@ -11,9 +11,9 @@ pub const Op = struct {
     rhs: ?*Ast,
 };
 
-fn factorial(n: i64) i64 {
-    var i: i64 = 1;
-    var fact: i64 = 1;
+fn factorial(n: f64) f64 {
+    var i: f64 = 1;
+    var fact: f64 = 1;
 
     while (i <= n) {
         fact *= i;
@@ -43,7 +43,7 @@ pub const Ast = union(enum) {
         }
     }
 
-    pub fn eval(self: *Ast) !i64 {
+    pub fn eval(self: *Ast) !f64 {
         return switch (self.*) {
             .atom => |a| a.value,
             .op => |o| blk: {
@@ -53,7 +53,7 @@ pub const Ast = union(enum) {
                     '+' => lhs + rhs,
                     '-' => lhs - rhs,
                     '*' => lhs * rhs,
-                    '/' => if (rhs == 0) error.DivisionByZero else @divTrunc(lhs, rhs),
+                    '/' => if (rhs == 0) error.DivisionByZero else lhs / rhs,
                     '!' => factorial(lhs),
                     else => error.UnsupportedOperator,
                 };

@@ -32,7 +32,7 @@ pub fn main() !void {
 
         const value = try ast.eval();
 
-        try out_writer.interface.print("{d}\n", .{value});
+        try out_writer.interface.print("{d:.02}\n", .{value});
         try out_writer.interface.flush();
     }
 }
