@@ -1,4 +1,5 @@
 const std = @import("std");
+const ct = @import("comptrie.zig");
 
 pub const Lexeme = union(enum) {
     illegal: void,
@@ -13,6 +14,8 @@ pub const Lexeme = union(enum) {
     lparen: u8,
     rparen: u8,
     bang: u8,
+    let: void,
+    eol: void,
     eof: void,
 
     pub fn get_oper_char(lex: *const Lexeme) ?u8 {
@@ -33,13 +36,18 @@ pub const Lexer = struct {
     read_pos: usize,
     cur_char: u8,
 
+    keywords: ct.CompTrie(Lexeme),
+
     pub fn init(src: []const u8) Lexer {
         var l = Lexer{
             .src = src,
             .cur_pos = 0,
             .read_pos = 0,
             .cur_char = 0,
+            .keywords = comptime .{},
         };
+
+        l.keywords.put("let", .let);
         l.read_char();
         return l;
     }
@@ -110,10 +118,16 @@ pub const Lexer = struct {
             '(' => Lexeme{ .lparen = l.cur_char },
             ')' => Lexeme{ .rparen = l.cur_char },
             '!' => Lexeme{ .bang = l.cur_char },
+            '\n' => Lexeme{ .eol = {} },
             0 => Lexeme{ .eof = {} },
             else => blk: {
                 if (Lexer.is_letter(l.cur_char)) {
                     const ident = l.parse_ident();
+
+                    if (l.keywords.get(ident)) |keyword| {
+                        return keyword;
+                    }
+
                     const lexeme = Lexeme{ .ident = ident };
                     return lexeme;
                 } else if (Lexer.is_digit(l.cur_char)) {
