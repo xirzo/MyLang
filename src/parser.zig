@@ -34,6 +34,7 @@ pub const Parser = struct {
             }
 
             if (try p.parse_statement()) |stmt| {
+                std.debug.print("Parsed statement\n", .{});
                 try program.statements.append(stmt);
             } else {
                 _ = p.lexer.next();
@@ -163,7 +164,7 @@ pub const Parser = struct {
         return lhs;
     }
 
-    pub fn parse_statement(p: *Parser) !?Statement {
+    pub fn parse_statement(p: *Parser) !?*Statement {
         const tok = p.lexer.peek();
 
         return switch (tok) {
@@ -179,12 +180,12 @@ pub const Parser = struct {
                 const expr_node = try p.parse_expression();
                 const stmt_node = try p.allocator.create(Statement);
                 stmt_node.* = Statement{ .expression = .{ .expression = expr_node } };
-                break :blk stmt_node.*;
+                break :blk stmt_node;
             },
         };
     }
 
-    fn parse_let(p: *Parser) !Statement {
+    fn parse_let(p: *Parser) !*Statement {
         const ident_lex = p.lexer.next();
 
         if (ident_lex != .ident) {
@@ -205,6 +206,7 @@ pub const Parser = struct {
         const value = try p.parse_expression();
 
         const let_stmt = try p.allocator.create(Statement);
+
         let_stmt.* = Statement{
             .let = .{
                 .name = name_copy,
@@ -212,6 +214,6 @@ pub const Parser = struct {
             },
         };
 
-        return let_stmt.*;
+        return let_stmt;
     }
 };

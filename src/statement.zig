@@ -3,21 +3,25 @@ const Lexeme = @import("lexer.zig").Lexeme;
 const Expression = @import("expression.zig").Expression;
 
 pub const Program = struct {
-    statements: std.array_list.Managed(Statement),
     allocator: std.mem.Allocator,
+    statements: std.array_list.Managed(*Statement),
     environment: std.StringHashMap(f64),
 
     pub fn init(allocator: std.mem.Allocator) Program {
         return Program{
-            .statements = std.array_list.Managed(Statement).init(allocator),
+            .statements = std.array_list.Managed(*Statement).init(allocator),
             .environment = std.StringHashMap(f64).init(allocator),
             .allocator = allocator,
         };
     }
 
     pub fn deinit(self: *Program) void {
-        for (self.statements.items) |*stmt| {
+        std.debug.print("Statements count: {d}\n", .{self.statements.items.len});
+
+        for (self.statements.items) |stmt| {
             stmt.deinit(self.allocator);
+            self.allocator.destroy(stmt);
+            std.debug.print("Deinited statement\n", .{});
         }
 
         self.statements.deinit();
