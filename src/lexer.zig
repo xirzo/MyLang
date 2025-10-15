@@ -13,6 +13,8 @@ pub const Lexeme = union(enum) {
     lparen: u8,
     rparen: u8,
     bang: u8,
+    let: void,
+    eol: void,
     eof: void,
 
     pub fn get_oper_char(lex: *const Lexeme) ?u8 {
@@ -40,6 +42,7 @@ pub const Lexer = struct {
             .read_pos = 0,
             .cur_char = 0,
         };
+
         l.read_char();
         return l;
     }
@@ -77,6 +80,14 @@ pub const Lexer = struct {
         return ch >= '0' and ch <= '9';
     }
 
+    // TODO: maybe write a trie for this
+    fn is_keyword(ident: []const u8) ?Lexeme {
+        if (std.mem.eql(u8, ident, "let")) {
+            return Lexeme{ .let = {} };
+        }
+        return null;
+    }
+
     fn parse_ident(l: *Lexer) []const u8 {
         const start_pos = l.cur_pos;
 
@@ -110,10 +121,16 @@ pub const Lexer = struct {
             '(' => Lexeme{ .lparen = l.cur_char },
             ')' => Lexeme{ .rparen = l.cur_char },
             '!' => Lexeme{ .bang = l.cur_char },
+            '\n' => Lexeme{ .eol = {} },
             0 => Lexeme{ .eof = {} },
             else => blk: {
                 if (Lexer.is_letter(l.cur_char)) {
                     const ident = l.parse_ident();
+
+                    if (is_keyword(ident)) |keyword| {
+                        return keyword;
+                    }
+
                     const lexeme = Lexeme{ .ident = ident };
                     return lexeme;
                 } else if (Lexer.is_digit(l.cur_char)) {

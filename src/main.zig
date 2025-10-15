@@ -10,6 +10,7 @@ pub fn main() !void {
     const stdin = std.fs.File.stdin();
     const stdout = std.fs.File.stdout();
     var out_writer = stdout.writer(&output_buffer);
+    const environment = try allocator.create(std.StringHashMap(f64));
 
     while (true) {
         const input_size = try stdin.read(&input_buffer);
@@ -23,16 +24,27 @@ pub fn main() !void {
         const lexer: Lexer = Lexer.init(input);
         var parser: Parser = Parser.init(lexer, allocator);
 
-        var ast = parser.parse_expr() catch {
+        const expression = parser.parse_expression() catch {
             try stdout.writeAll("Command does not exist\n");
             continue;
         };
 
-        defer ast.deinit(allocator);
+        defer expression.deinit(allocator);
 
-        const value = try ast.eval();
+        const value = try expression.eval(environment);
 
         try out_writer.interface.print("{d:.02}\n", .{value});
         try out_writer.interface.flush();
     }
+
+    // const allocator = std.heap.page_allocator;
+    // const input = "let a = 5 + 5;";
+    //
+    // const lexer: Lexer = Lexer.init(input);
+    // var parser: Parser = Parser.init(lexer, allocator);
+    //
+    // _ = parser.parse() catch {
+    //     // try stdout.writeAll("Command does not exist\n");
+    //     // continue;
+    // };
 }
