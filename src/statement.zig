@@ -76,7 +76,7 @@ pub const Statement = union(enum) {
     pub fn execute(self: *const Statement, environment: *std.StringHashMap(f64)) !void {
         switch (self.*) {
             .let => |let_stmt| {
-                const value = try let_stmt.value.eval(environment);
+                const value = try let_stmt.value.evaluate(environment);
                 try environment.put(let_stmt.name, value);
             },
             .expression => |_| {},

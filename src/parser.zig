@@ -33,7 +33,7 @@ pub const Parser = struct {
                 continue;
             }
 
-            if (try p.parse_statement()) |stmt| {
+            if (try p.parseStatement()) |stmt| {
                 std.debug.print("Parsed statement\n", .{});
                 try program.statements.append(stmt);
             } else {
@@ -50,18 +50,18 @@ pub const Parser = struct {
         return program;
     }
 
-    pub fn parse_expression(p: *Parser) !*Expression {
-        return try p.expr(0);
+    pub fn parseExpression(p: *Parser) !*Expression {
+        return try p.expression(0);
     }
 
-    fn prefix_binding_power(op: u8) ?u8 {
+    fn prefixBindingPower(op: u8) ?u8 {
         return switch (op) {
             '+', '-' => 5,
             else => null,
         };
     }
 
-    fn infix_binding_power(op: u8) ?struct { u8, u8 } {
+    fn infixBindingPower(op: u8) ?struct { u8, u8 } {
         return switch (op) {
             '=' => .{ 1, 2 },
             '+', '-' => .{ 2, 3 },
@@ -70,14 +70,14 @@ pub const Parser = struct {
         };
     }
 
-    fn postfix_binding_power(op: u8) ?u8 {
+    fn postfixBindingPower(op: u8) ?u8 {
         return switch (op) {
             '!' => 7,
             else => null,
         };
     }
 
-    fn expr(p: *Parser, min_bp: u8) !*Expression {
+    fn expression(p: *Parser, min_bp: u8) !*Expression {
         const lex: Lexeme = p.lexer.next();
 
         var lhs: *Expression = switch (lex) {
@@ -87,14 +87,14 @@ pub const Parser = struct {
                 break :blk expr_node;
             },
             .lparen => blk: {
-                const lhs_expr = try p.expr(0);
+                const lhs_expr = try p.expression(0);
                 assert(p.lexer.next() == .rparen);
                 break :blk lhs_expr;
             },
             else => blk: {
-                if (lex.get_oper_char()) |char| {
-                    if (prefix_binding_power(char)) |r_bp| {
-                        const rhs = try p.expr(r_bp);
+                if (lex.getOperatorChar()) |char| {
+                    if (prefixBindingPower(char)) |r_bp| {
+                        const rhs = try p.expression(r_bp);
                         const expr_node = try p.allocator.create(Expression);
                         expr_node.* = Expression{ .binary_operator = .{ .lhs = null, .rhs = rhs, .value = char } };
                         break :blk expr_node;
@@ -115,13 +115,13 @@ pub const Parser = struct {
             const oper_char: u8 = switch (oper_lex) {
                 .eof => break,
                 else => blk: {
-                    const maybe_char = oper_lex.get_oper_char();
+                    const maybe_char = oper_lex.getOperatorChar();
                     if (maybe_char == null) break;
                     break :blk maybe_char.?;
                 },
             };
 
-            if (postfix_binding_power(oper_char)) |l_bp| {
+            if (postfixBindingPower(oper_char)) |l_bp| {
                 if (min_bp > l_bp) {
                     break;
                 }
@@ -134,7 +134,7 @@ pub const Parser = struct {
                 continue;
             }
 
-            if (infix_binding_power(oper_char)) |bp| {
+            if (infixBindingPower(oper_char)) |bp| {
                 const l_bp = bp[0];
                 const r_bp = bp[1];
 
@@ -144,7 +144,7 @@ pub const Parser = struct {
 
                 _ = p.lexer.next();
 
-                const rhs = try p.expr(r_bp);
+                const rhs = try p.expression(r_bp);
 
                 const new_lhs = try p.allocator.create(Expression);
                 new_lhs.* = Expression{
@@ -164,20 +164,20 @@ pub const Parser = struct {
         return lhs;
     }
 
-    pub fn parse_statement(p: *Parser) !?*Statement {
+    pub fn parseStatement(p: *Parser) !?*Statement {
         const tok = p.lexer.peek();
 
         return switch (tok) {
             .let => blk: {
                 _ = p.lexer.next();
-                break :blk try p.parse_let();
+                break :blk try p.parseLetStatement();
             },
             else => blk: {
                 if (tok == .semicolon or tok == .eol or tok == .eof) {
                     return null;
                 }
 
-                const expr_node = try p.parse_expression();
+                const expr_node = try p.parseExpression();
                 const stmt_node = try p.allocator.create(Statement);
                 stmt_node.* = Statement{ .expression = .{ .expression = expr_node } };
                 break :blk stmt_node;
@@ -185,7 +185,7 @@ pub const Parser = struct {
         };
     }
 
-    fn parse_let(p: *Parser) !*Statement {
+    fn parseLetStatement(p: *Parser) !*Statement {
         const ident_lex = p.lexer.next();
 
         if (ident_lex != .ident) {
@@ -203,7 +203,7 @@ pub const Parser = struct {
             return error.ParseError;
         }
 
-        const value = try p.parse_expression();
+        const value = try p.parseExpression();
 
         const let_stmt = try p.allocator.create(Statement);
 

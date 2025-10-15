@@ -3,40 +3,40 @@ const Lexer = @import("lexer.zig").Lexer;
 const Lexeme = @import("lexer.zig").Lexeme;
 const Parser = @import("parser.zig").Parser;
 
-test "evaluate arithmetic expression" {
+test "evaluate arithmetic program" {
     const src = "5 + 5";
     const lexer: Lexer = Lexer.init(src);
     var parser: Parser = Parser.init(lexer, std.testing.allocator);
 
-    var ast = try parser.expr();
-    defer ast.deinit(std.testing.allocator);
+    var program = try parser.parse();
+    defer program.deinit();
 
-    const result = try ast.eval();
-    try std.testing.expectEqual(@as(i64, 10), result);
+    try program.execute();
+    try std.testing.expectEqual(@as(f64, 10), result);
 }
 
-test "evaluate complex arithmetic expression" {
+test "evaluate complex arithmetic program" {
     const src = "5 + 5 * 2";
     const lexer: Lexer = Lexer.init(src);
     var parser: Parser = Parser.init(lexer, std.testing.allocator);
 
-    var ast = try parser.expr();
-    defer ast.deinit(std.testing.allocator);
+    var program = try parser.parse();
+    defer program.deinit();
 
-    const result = try ast.eval();
-    try std.testing.expectEqual(@as(i64, 15), result);
+    try program.execute();
+    try std.testing.expectEqual(@as(f64, 15), result);
 }
 
-test "evaluate parentheses expression" {
+test "evaluate parentheses program" {
     const src = "(5 + 5) * 2";
     const lexer: Lexer = Lexer.init(src);
     var parser: Parser = Parser.init(lexer, std.testing.allocator);
 
-    var ast = try parser.expr();
-    defer ast.deinit(std.testing.allocator);
+    var program = try parser.parseExpression();
+    defer program.deinit();
 
-    const result = try ast.eval();
-    try std.testing.expectEqual(@as(i64, 20), result);
+    try program.execute();
+    try std.testing.expectEqual(@as(f64, 20), result);
 }
 
 test "evaluate substraction" {
@@ -44,9 +44,9 @@ test "evaluate substraction" {
     const lexer: Lexer = Lexer.init(src);
     var parser: Parser = Parser.init(lexer, std.testing.allocator);
 
-    var ast = try parser.expr();
-    defer ast.deinit(std.testing.allocator);
+    var program = try parser.parseExpression();
+    defer program.deinit();
 
-    const result = try ast.eval();
-    try std.testing.expectEqual(@as(i64, -5), result);
+    try program.execute();
+    try std.testing.expectEqual(@as(f64, -5), result);
 }

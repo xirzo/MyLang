@@ -17,7 +17,7 @@ pub const Lexeme = union(enum) {
     eol: void,
     eof: void,
 
-    pub fn get_oper_char(lex: *const Lexeme) ?u8 {
+    pub fn getOperatorChar(lex: *const Lexeme) ?u8 {
         return switch (lex.*) {
             .plus => |char| char,
             .asterisk => |char| char,
@@ -43,11 +43,11 @@ pub const Lexer = struct {
             .cur_char = 0,
         };
 
-        l.read_char();
+        l.readChar();
         return l;
     }
 
-    fn read_char(l: *Lexer) void {
+    fn readChar(l: *Lexer) void {
         if (l.read_pos >= l.src.len) {
             l.cur_char = 0;
         } else {
@@ -58,7 +58,7 @@ pub const Lexer = struct {
         l.read_pos += 1;
     }
 
-    fn peek_char(l: *Lexer) u8 {
+    fn peekChar(l: *Lexer) u8 {
         if (l.read_pos >= l.src.len) {
             return 0;
         } else {
@@ -66,50 +66,50 @@ pub const Lexer = struct {
         }
     }
 
-    fn skip_whitespaces(l: *Lexer) void {
+    fn skipWhitespaces(l: *Lexer) void {
         while (l.cur_char == ' ' or l.cur_char == '\t' or l.cur_char == '\n' or l.cur_char == '\r') {
-            l.read_char();
+            l.readChar();
         }
     }
 
-    fn is_letter(ch: u8) bool {
+    fn isLetter(ch: u8) bool {
         return (ch >= 'a' and ch <= 'z') or (ch >= 'A' and ch <= 'Z') or (ch == '_');
     }
 
-    fn is_digit(ch: u8) bool {
+    fn isDigit(ch: u8) bool {
         return ch >= '0' and ch <= '9';
     }
 
     // TODO: maybe write a trie for this
-    fn is_keyword(ident: []const u8) ?Lexeme {
+    fn isKeyword(ident: []const u8) ?Lexeme {
         if (std.mem.eql(u8, ident, "let")) {
             return Lexeme{ .let = {} };
         }
         return null;
     }
 
-    fn parse_ident(l: *Lexer) []const u8 {
+    fn parseIdentifier(l: *Lexer) []const u8 {
         const start_pos = l.cur_pos;
 
-        while (Lexer.is_letter(l.cur_char)) {
-            l.read_char();
+        while (Lexer.isLetter(l.cur_char)) {
+            l.readChar();
         }
 
         return l.src[start_pos..l.cur_pos];
     }
 
-    fn parse_number(l: *Lexer) []const u8 {
+    fn parseNumber(l: *Lexer) []const u8 {
         const start_pos = l.cur_pos;
 
-        while (Lexer.is_digit(l.cur_char)) {
-            l.read_char();
+        while (Lexer.isDigit(l.cur_char)) {
+            l.readChar();
         }
 
         return l.src[start_pos..l.cur_pos];
     }
 
     pub fn next(l: *Lexer) Lexeme {
-        l.skip_whitespaces();
+        l.skipWhitespaces();
 
         const lexeme = switch (l.cur_char) {
             '+' => Lexeme{ .plus = l.cur_char },
@@ -124,17 +124,17 @@ pub const Lexer = struct {
             '\n' => Lexeme{ .eol = {} },
             0 => Lexeme{ .eof = {} },
             else => blk: {
-                if (Lexer.is_letter(l.cur_char)) {
-                    const ident = l.parse_ident();
+                if (Lexer.isLetter(l.cur_char)) {
+                    const ident = l.parseIdentifier();
 
-                    if (is_keyword(ident)) |keyword| {
+                    if (isKeyword(ident)) |keyword| {
                         return keyword;
                     }
 
                     const lexeme = Lexeme{ .ident = ident };
                     return lexeme;
-                } else if (Lexer.is_digit(l.cur_char)) {
-                    const num_str = l.parse_number();
+                } else if (Lexer.isDigit(l.cur_char)) {
+                    const num_str = l.parseNumber();
                     const num = std.fmt.parseFloat(f64, num_str) catch 0;
                     const lexeme = Lexeme{ .number = num };
                     return lexeme;
@@ -144,7 +144,7 @@ pub const Lexer = struct {
             },
         };
 
-        l.read_char();
+        l.readChar();
         return lexeme;
     }
 

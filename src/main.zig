@@ -24,7 +24,7 @@ pub fn main() !void {
         const lexer: Lexer = Lexer.init(input);
         var parser: Parser = Parser.init(lexer, allocator);
 
-        const expression = parser.parse_expression() catch {
+        const expression = parser.parseExpression() catch {
             try stdout.writeAll("Command does not exist\n");
             continue;
         };

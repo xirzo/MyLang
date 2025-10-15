@@ -38,13 +38,13 @@ pub const Expression = union(enum) {
         }
     }
 
-    pub fn eval(self: *Expression, env: *std.StringHashMap(f64)) !f64 {
+    pub fn evaluate(self: *Expression, env: *std.StringHashMap(f64)) !f64 {
         return switch (self.*) {
             .constant => |a| a.value,
             .variable => |vrbl| env.get(vrbl.name) orelse error.UndefinedVariable,
             .binary_operator => |o| blk: {
-                const lhs = if (o.lhs) |l| try l.eval(env) else 0;
-                const rhs = if (o.rhs) |r| try r.eval(env) else 0;
+                const lhs = if (o.lhs) |l| try l.evaluate(env) else 0;
+                const rhs = if (o.rhs) |r| try r.evaluate(env) else 0;
                 break :blk switch (o.value) {
                     '+' => lhs + rhs,
                     '-' => lhs - rhs,
