@@ -31,7 +31,7 @@ pub fn main() !void {
 
         defer expression.deinit(allocator);
 
-        const value = try expression.eval(environment);
+        const value = try expression.evaluate(environment);
 
         try out_writer.interface.print("{d:.02}\n", .{value});
         try out_writer.interface.flush();
