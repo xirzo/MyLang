@@ -4,47 +4,39 @@ const Lexeme = @import("lexer.zig").Lexeme;
 const Parser = @import("parser.zig").Parser;
 
 pub fn main() !void {
-    var input_buffer: [1024]u8 = undefined;
+    var stdout = std.fs.File.stdout();
     var output_buffer: [1024]u8 = undefined;
-    const allocator = std.heap.page_allocator;
-    const stdin = std.fs.File.stdin();
-    const stdout = std.fs.File.stdout();
     var out_writer = stdout.writer(&output_buffer);
-    const environment = try allocator.create(std.StringHashMap(f64));
 
-    while (true) {
-        const input_size = try stdin.read(&input_buffer);
+    const allocator = std.heap.page_allocator;
 
-        if (input_size == 0) {
-            continue;
-        }
+    var arg_iterator = try std.process.argsWithAllocator(allocator);
+    defer arg_iterator.deinit();
 
-        const input = input_buffer[0..input_size];
+    const program_name = arg_iterator.next();
 
-        const lexer: Lexer = Lexer.init(input);
-        var parser: Parser = Parser.init(lexer, allocator);
-
-        const expression = parser.parseExpression() catch {
-            try stdout.writeAll("Command does not exist\n");
-            continue;
-        };
-
-        defer expression.deinit(allocator);
-
-        const value = try expression.evaluate(environment);
-
-        try out_writer.interface.print("{d:.02}\n", .{value});
+    const path = arg_iterator.next() orelse {
+        try out_writer.interface.print("Usage: {s} <path>\n", .{program_name.?});
         try out_writer.interface.flush();
-    }
+        return;
+    };
 
-    // const allocator = std.heap.page_allocator;
-    // const input = "let a = 5 + 5;";
-    //
-    // const lexer: Lexer = Lexer.init(input);
-    // var parser: Parser = Parser.init(lexer, allocator);
-    //
-    // _ = parser.parse() catch {
-    //     // try stdout.writeAll("Command does not exist\n");
-    //     // continue;
-    // };
+    const file = try std.fs.Dir.openFile(std.fs.cwd(), path, .{ .mode = .read_only });
+    defer file.close();
+
+    var input_buffer: [1024]u8 = undefined;
+    var reader = file.reader(&input_buffer);
+    reader.interface.readSliceAll(&input_buffer) catch |err| switch (err) {
+        error.ReadFailed => unreachable,
+        error.EndOfStream => {},
+    };
+
+    const lexer: Lexer = Lexer.init(&input_buffer);
+    var parser: Parser = Parser.init(lexer, allocator);
+    var program = try parser.parse();
+    defer program.deinit();
+
+    try program.execute();
+
+    program.printEnvironment();
 }

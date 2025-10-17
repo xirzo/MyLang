@@ -1,10 +1,16 @@
 This is a simple interpreter written in [Zig](https://ziglang.org) in order to learn it. It utilizes [Pratt parsing](https://en.wikipedia.org/wiki/Operator-precedence_parser) technique. Currently it only parses only expressions.
 
+## Current usage
+
+```sh
+./mylang sample.my
+```
+
 ## Need to do
 
 ### Parsing
 
-- [] parse statements
+- [x] parse let statements
 - [x] parse infix operators
 - [x] parse prefix operators
 - [x] parse postfix operators

@@ -67,7 +67,7 @@ pub const Lexer = struct {
     }
 
     fn skipWhitespaces(l: *Lexer) void {
-        while (l.cur_char == ' ' or l.cur_char == '\t' or l.cur_char == '\n' or l.cur_char == '\r') {
+        while (l.cur_char == ' ' or l.cur_char == '\t' or l.cur_char == '\n' or l.cur_char == '\r' or l.cur_char == 170) {
             l.readChar();
         }
     }
@@ -139,6 +139,7 @@ pub const Lexer = struct {
                     const lexeme = Lexeme{ .number = num };
                     return lexeme;
                 } else {
+                    std.log.err("illegal character: '{c}' (byte value: {d})", .{ l.cur_char, l.cur_char });
                     break :blk Lexeme{ .illegal = {} };
                 }
             },
