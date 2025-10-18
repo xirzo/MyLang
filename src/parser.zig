@@ -1,12 +1,9 @@
 const std = @import("std");
-const Lexer = @import("lexer.zig").Lexer;
-const Lexeme = @import("lexer.zig").Lexeme;
-const Expression = @import("expression.zig").Expression;
-const Statement = @import("statement.zig").Statement;
-const Block = @import("statement.zig").Block;
-const Program = @import("statement.zig").Program;
+const lex = @import("lexer.zig");
+const e = @import("expression.zig");
+const pg = @import("program.zig");
+const stmt = @import("statement.zig");
 const assert = std.debug.assert;
-const BinaryOperator = @import("expression.zig").BinaryOperator;
 
 pub const ParseError = error{
     UnexpectedToken,
@@ -24,6 +21,7 @@ pub const ParseError = error{
     ExpectedIdentifier,
     ExpectedAssignment,
     ExpectedSemicolon,
+    ExpectedRParen,
 
     OutOfMemory,
 
@@ -31,18 +29,18 @@ pub const ParseError = error{
 };
 
 pub const Parser = struct {
-    lexer: Lexer,
+    lexer: lex.Lexer,
     allocator: std.mem.Allocator,
 
-    pub fn init(l: Lexer, allocator: std.mem.Allocator) Parser {
+    pub fn init(l: lex.Lexer, allocator: std.mem.Allocator) Parser {
         return Parser{
             .lexer = l,
             .allocator = allocator,
         };
     }
 
-    pub fn parse(p: *Parser) ParseError!Program {
-        var program = Program.init(p.allocator);
+    pub fn parse(p: *Parser) ParseError!pg.Program {
+        var program = pg.Program.init(p.allocator);
 
         std.debug.print("start parsing\n", .{});
 
@@ -58,8 +56,8 @@ pub const Parser = struct {
                 continue;
             }
 
-            if (try p.parseStatement()) |stmt| {
-                try program.statements.append(stmt);
+            if (try p.parseStatement()) |statement| {
+                try program.statements.append(statement);
                 std.debug.print("parsed statement\n", .{});
             } else {
                 _ = p.lexer.next();
@@ -75,7 +73,7 @@ pub const Parser = struct {
         return program;
     }
 
-    pub fn parseExpression(p: *Parser) !*Expression {
+    pub fn parseExpression(p: *Parser) !*e.Expression {
         return try p.expression(0);
     }
 
@@ -102,20 +100,31 @@ pub const Parser = struct {
         };
     }
 
-    fn expression(p: *Parser, min_bp: u8) ParseError!*Expression {
-        const lex: Lexeme = p.lexer.next();
+    fn expression(p: *Parser, min_bp: u8) ParseError!*e.Expression {
+        const lex_item: lex.Lexeme = p.lexer.next();
 
-        var lhs: *Expression = switch (lex) {
+        var lhs: *e.Expression = switch (lex_item) {
             .number => |num| blk: {
-                const expr_node: *Expression = try p.allocator.create(Expression);
-                expr_node.* = Expression{ .constant = .{ .value = num } };
+                const expr_node: *e.Expression = try p.allocator.create(e.Expression);
+                expr_node.* = e.Expression{ .constant = .{ .value = num } };
                 break :blk expr_node;
             },
             .ident => |name| blk: {
-                const name_copy = try p.allocator.dupe(u8, name);
-                const expr_node: *Expression = try p.allocator.create(Expression);
-                expr_node.* = Expression{ .variable = .{ .name = name_copy } };
-                break :blk expr_node;
+                if (p.lexer.next() != .lparen) {
+                    // just a variable
+                    const name_copy = try p.allocator.dupe(u8, name);
+                    const expr_node: *e.Expression = try p.allocator.create(e.Expression);
+                    expr_node.* = e.Expression{ .variable = .{ .name = name_copy } };
+                    break :blk expr_node;
+                }
+
+                // TODO: parse parameters
+
+                if (p.lexer.next() != .rparen) {
+                    return error.ExpectedRParen;
+                }
+
+                unreachable;
             },
             .lparen => blk: {
                 const lhs_expr = try p.expression(0);
@@ -123,25 +132,25 @@ pub const Parser = struct {
                 break :blk lhs_expr;
             },
             else => blk: {
-                if (lex.getOperatorChar()) |char| {
+                if (lex_item.getOperatorChar()) |char| {
                     if (prefixBindingPower(char)) |r_bp| {
                         const rhs = try p.expression(r_bp);
-                        const expr_node = try p.allocator.create(Expression);
-                        expr_node.* = Expression{ .binary_operator = .{ .lhs = null, .rhs = rhs, .value = char } };
+                        const expr_node = try p.allocator.create(e.Expression);
+                        expr_node.* = e.Expression{ .binary_operator = .{ .lhs = null, .rhs = rhs, .value = char } };
                         break :blk expr_node;
                     } else {
-                        std.log.err("operator cannot be used as prefix {any}\n", .{lex});
+                        std.log.err("operator cannot be used as prefix {any}\n", .{lex_item});
                         return error.ParseError;
                     }
                 } else {
-                    std.log.err("bad lexeme for expression parse {any}\n", .{lex});
+                    std.log.err("bad lexeme for expression parse {any}\n", .{lex_item});
                     return error.BadExpressionLexeme;
                 }
             },
         };
 
         while (true) {
-            const oper_lex: Lexeme = p.lexer.peek();
+            const oper_lex: lex.Lexeme = p.lexer.peek();
 
             const oper_char: u8 = switch (oper_lex) {
                 .eof => break,
@@ -159,8 +168,8 @@ pub const Parser = struct {
 
                 _ = p.lexer.next();
 
-                const new_lhs = try p.allocator.create(Expression);
-                new_lhs.* = Expression{ .binary_operator = .{ .lhs = lhs, .rhs = null, .value = oper_char } };
+                const new_lhs = try p.allocator.create(e.Expression);
+                new_lhs.* = e.Expression{ .binary_operator = .{ .lhs = lhs, .rhs = null, .value = oper_char } };
                 lhs = new_lhs;
                 continue;
             }
@@ -177,8 +186,8 @@ pub const Parser = struct {
 
                 const rhs = try p.expression(r_bp);
 
-                const new_lhs = try p.allocator.create(Expression);
-                new_lhs.* = Expression{
+                const new_lhs = try p.allocator.create(e.Expression);
+                new_lhs.* = e.Expression{
                     .binary_operator = .{
                         .value = oper_char,
                         .lhs = lhs,
@@ -195,7 +204,7 @@ pub const Parser = struct {
         return lhs;
     }
 
-    pub fn parseStatement(p: *Parser) ParseError!?*Statement {
+    pub fn parseStatement(p: *Parser) ParseError!?*stmt.Statement {
         const tok = p.lexer.peek();
 
         std.debug.print("got lexeme: {s}\n", .{@tagName(tok)});
@@ -214,14 +223,14 @@ pub const Parser = struct {
                 }
 
                 const expr_node = try p.parseExpression();
-                const stmt_node = try p.allocator.create(Statement);
-                stmt_node.* = Statement{ .expression = .{ .expression = expr_node } };
+                const stmt_node = try p.allocator.create(stmt.Statement);
+                stmt_node.* = stmt.Statement{ .expression = .{ .expression = expr_node } };
                 break :blk stmt_node;
             },
         };
     }
 
-    fn parseLet(p: *Parser) ParseError!*Statement {
+    fn parseLet(p: *Parser) ParseError!*stmt.Statement {
         _ = p.lexer.next();
 
         const ident_lex = p.lexer.next();
@@ -243,9 +252,9 @@ pub const Parser = struct {
 
         const value = try p.parseExpression();
 
-        const let_stmt = try p.allocator.create(Statement);
+        const let_stmt = try p.allocator.create(stmt.Statement);
 
-        let_stmt.* = Statement{
+        let_stmt.* = stmt.Statement{
             .let = .{
                 .name = name_copy,
                 .value = value,
@@ -255,7 +264,7 @@ pub const Parser = struct {
         return let_stmt;
     }
 
-    pub fn parseBlock(p: *Parser) ParseError!*Statement {
+    pub fn parseBlock(p: *Parser) ParseError!*stmt.Statement {
         if (p.lexer.peek() != .lbrace) {
             std.log.err("expected '{{' at start of block, got {s}", .{@tagName(p.lexer.peek())});
             return error.MissingOpeningBrace;
@@ -263,13 +272,13 @@ pub const Parser = struct {
 
         _ = p.lexer.next();
 
-        var block_statements = std.array_list.Managed(*Statement).init(p.allocator);
+        var block_statements = std.array_list.Managed(*stmt.Statement).init(p.allocator);
         var block_environment = std.StringHashMap(f64).init(p.allocator);
 
         errdefer {
-            for (block_statements.items) |stmt| {
-                stmt.deinit(p.allocator);
-                p.allocator.destroy(stmt);
+            for (block_statements.items) |statement| {
+                statement.deinit(p.allocator);
+                p.allocator.destroy(statement);
             }
             block_statements.deinit();
             block_environment.deinit();
@@ -286,8 +295,8 @@ pub const Parser = struct {
                 continue;
             }
 
-            if (try p.parseStatement()) |stmt| {
-                try block_statements.append(stmt);
+            if (try p.parseStatement()) |statement| {
+                try block_statements.append(statement);
             }
 
             const next_tok = p.lexer.peek();
@@ -299,9 +308,9 @@ pub const Parser = struct {
 
         _ = p.lexer.next();
 
-        const block_stmt = try p.allocator.create(Statement);
+        const block_stmt = try p.allocator.create(stmt.Statement);
 
-        block_stmt.* = Statement{ .block = .{
+        block_stmt.* = stmt.Statement{ .block = .{
             .statements = block_statements,
             .environment = block_environment,
         } };
@@ -309,7 +318,7 @@ pub const Parser = struct {
         return block_stmt;
     }
 
-    pub fn parseFunctionDeclaration(p: *Parser) ParseError!*Statement {
+    pub fn parseFunctionDeclaration(p: *Parser) ParseError!*stmt.Statement {
         _ = p.lexer.next();
 
         const ident_lex = p.lexer.next();
@@ -333,17 +342,17 @@ pub const Parser = struct {
 
         const block_stmt = try p.parseBlock();
 
-        const block_ptr = try p.allocator.create(Block);
+        const block_ptr = try p.allocator.create(stmt.Block);
         errdefer p.allocator.destroy(block_ptr);
 
         switch (block_stmt.*) {
             .block => |*blk| {
-                block_ptr.* = Block{
+                block_ptr.* = stmt.Block{
                     .statements = blk.statements,
                     .environment = blk.environment,
                 };
 
-                blk.statements = std.array_list.Managed(*Statement).init(p.allocator);
+                blk.statements = std.array_list.Managed(*stmt.Statement).init(p.allocator);
                 blk.environment = std.StringHashMap(f64).init(p.allocator);
             },
             else => {
@@ -353,8 +362,8 @@ pub const Parser = struct {
             },
         }
 
-        const function_declaration = try p.allocator.create(Statement);
-        function_declaration.* = Statement{ .function_declaration = .{
+        const function_declaration = try p.allocator.create(stmt.Statement);
+        function_declaration.* = stmt.Statement{ .function_declaration = .{
             .ident = ident,
             .block = block_ptr,
         } };
