@@ -41,3 +41,25 @@ test "assign vartiable value to a variable" {
 
     try std.testing.expect(value == 6.0);
 }
+
+// test "assign block to a variable" {
+//     const src =
+//         \\let x = {
+//         \\
+//         \\};
+//     ;
+//     const lexer: Lexer = Lexer.init(src);
+//     var parser: Parser = Parser.init(lexer, std.testing.allocator);
+//
+//     var program = try parser.parse();
+//     defer program.deinit();
+//
+//     try program.execute();
+//
+//     const value = program.environment.get("y") orelse {
+//         std.debug.print("Variable 'y' not found in environment\n", .{});
+//         return error.TestExpectedEqual;
+//     };
+//
+//     try std.testing.expect(value == 6.0);
+// }

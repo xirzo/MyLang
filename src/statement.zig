@@ -11,11 +11,13 @@ pub const Program = struct {
     allocator: std.mem.Allocator,
     statements: std.array_list.Managed(*Statement),
     environment: std.StringHashMap(f64),
+    functions: std.StringHashMap(*FunctionDeclaration),
 
     pub fn init(allocator: std.mem.Allocator) Program {
         return Program{
             .statements = std.array_list.Managed(*Statement).init(allocator),
             .environment = std.StringHashMap(f64).init(allocator),
+            .functions = std.StringHashMap(*FunctionDeclaration).init(allocator),
             .allocator = allocator,
         };
     }
@@ -29,14 +31,29 @@ pub const Program = struct {
             std.debug.print("Deinited statement\n", .{});
         }
 
+        var func_it = self.functions.iterator();
+
+        while (func_it.next()) |entry| {
+            self.allocator.destroy(entry.value_ptr.*);
+        }
+
         self.statements.deinit();
         self.environment.deinit();
+        self.functions.deinit();
     }
 
     pub fn execute(self: *Program) !void {
         for (self.statements.items) |stmt| {
-            try stmt.execute(&self.environment);
+            try stmt.execute(self);
         }
+    }
+
+    pub fn registerFunction(self: *Program, func_decl: *FunctionDeclaration) !void {
+        try self.functions.put(func_decl.ident, func_decl);
+    }
+
+    pub fn getFunction(self: *Program, name: []const u8) ?*FunctionDeclaration {
+        return self.functions.get(name);
     }
 
     pub fn printEnvironment(self: *const Program) void {
@@ -60,19 +77,46 @@ pub const ExpressionStatement = struct {
     expression: *Expression,
 };
 
-// pub const FunctionDeclaration = struct {
-//     identifier: *Expression,
-// };
-
 pub const Block = struct {
     statements: std.array_list.Managed(*Statement),
     environment: std.StringHashMap(f64),
+
+    pub fn deinit(self: *Block, allocator: std.mem.Allocator) void {
+        for (self.statements.items) |block_statement| {
+            block_statement.deinit(allocator);
+            allocator.destroy(block_statement);
+        }
+
+        self.statements.deinit();
+        self.environment.deinit();
+    }
+
+    pub fn execute(self: *Block, program: *Program) ExecutionError!void {
+        for (self.statements.items) |block_statement| {
+            try block_statement.execute(program);
+        }
+    }
+};
+
+pub const FunctionDeclaration = struct {
+    ident: []const u8,
+    block: *Block,
+
+    pub fn create(allocator: std.mem.Allocator, name: []const u8, block_stmt: *Block) !*FunctionDeclaration {
+        const func = try allocator.create(FunctionDeclaration);
+        func.* = FunctionDeclaration{
+            .ident = name,
+            .block = block_stmt,
+        };
+        return func;
+    }
 };
 
 pub const Statement = union(enum) {
     let: Let,
     expression: ExpressionStatement,
     block: Block,
+    function_declaration: FunctionDeclaration,
 
     pub fn deinit(self: *Statement, allocator: std.mem.Allocator) void {
         switch (self.*) {
@@ -85,29 +129,25 @@ pub const Statement = union(enum) {
                 expr_stmt.expression.deinit(allocator);
                 allocator.destroy(expr_stmt.expression);
             },
-            .block => |*block| {
-                for (block.statements.items) |block_statement| {
-                    block_statement.deinit(allocator);
-                    allocator.destroy(block_statement);
-                }
-
-                block.statements.deinit();
-                block.environment.deinit();
+            .block => |*block| block.deinit(allocator),
+            .function_declaration => |function_declaration| {
+                function_declaration.block.deinit(allocator);
+                allocator.destroy(function_declaration.block);
             },
         }
     }
 
-    pub fn execute(self: *Statement, environment: *std.StringHashMap(f64)) ExecutionError!void {
+    pub fn execute(self: *Statement, program: *Program) ExecutionError!void {
         switch (self.*) {
             .let => |let_stmt| {
-                const value = try let_stmt.value.evaluate(environment);
-                try environment.put(let_stmt.name, value);
+                const value = try let_stmt.value.evaluate(&program.environment);
+                try program.environment.put(let_stmt.name, value);
             },
             .expression => |_| {},
-            .block => |*block| {
-                for (block.statements.items) |block_statement| {
-                    try block_statement.execute(&block.environment);
-                }
+            .block => |*block| try block.execute(program),
+            .function_declaration => |*function_declaration| {
+                const func = try FunctionDeclaration.create(program.allocator, function_declaration.ident, function_declaration.block);
+                try program.registerFunction(func);
             },
         }
     }

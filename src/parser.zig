@@ -3,6 +3,7 @@ const Lexer = @import("lexer.zig").Lexer;
 const Lexeme = @import("lexer.zig").Lexeme;
 const Expression = @import("expression.zig").Expression;
 const Statement = @import("statement.zig").Statement;
+const Block = @import("statement.zig").Block;
 const Program = @import("statement.zig").Program;
 const assert = std.debug.assert;
 const BinaryOperator = @import("expression.zig").BinaryOperator;
@@ -43,6 +44,8 @@ pub const Parser = struct {
     pub fn parse(p: *Parser) ParseError!Program {
         var program = Program.init(p.allocator);
 
+        std.debug.print("start parsing\n", .{});
+
         while (true) {
             const tok = p.lexer.peek();
 
@@ -56,8 +59,8 @@ pub const Parser = struct {
             }
 
             if (try p.parseStatement()) |stmt| {
-                std.debug.print("Parsed statement\n", .{});
                 try program.statements.append(stmt);
+                std.debug.print("parsed statement\n", .{});
             } else {
                 _ = p.lexer.next();
             }
@@ -195,13 +198,16 @@ pub const Parser = struct {
     pub fn parseStatement(p: *Parser) ParseError!?*Statement {
         const tok = p.lexer.peek();
 
+        std.debug.print("got lexeme: {s}\n", .{@tagName(tok)});
+
         return switch (tok) {
-            .let => blk: {
-                // TODO: move p.lexer.next() into parseLet
-                _ = p.lexer.next();
-                break :blk try p.parseLet();
-            },
+            .let => try p.parseLet(),
             .lbrace => try p.parseBlock(),
+            .function => try p.parseFunctionDeclaration(),
+            // NOTE: parsing function calls may produce errors when creating expression
+            // statement like:
+            // x + 5 (cause x is ident is goes before 5),
+            // 5 + x should work
             else => blk: {
                 if (tok == .semicolon or tok == .eol or tok == .eof) {
                     return null;
@@ -216,6 +222,8 @@ pub const Parser = struct {
     }
 
     fn parseLet(p: *Parser) ParseError!*Statement {
+        _ = p.lexer.next();
+
         const ident_lex = p.lexer.next();
 
         if (ident_lex != .ident) {
@@ -299,5 +307,60 @@ pub const Parser = struct {
         } };
 
         return block_stmt;
+    }
+
+    pub fn parseFunctionDeclaration(p: *Parser) ParseError!*Statement {
+        _ = p.lexer.next();
+
+        const ident_lex = p.lexer.next();
+        if (ident_lex != .ident) {
+            std.log.err("expected identifier after 'fn' keyword, got {s}", .{@tagName(p.lexer.peek())});
+            return error.ExpectedIdentifier;
+        }
+        const ident = ident_lex.ident;
+
+        if (p.lexer.next() != .lparen) {
+            std.log.err("expected '(' after function name, got {s}", .{@tagName(p.lexer.peek())});
+            return error.MissingOpeningParenthesis;
+        }
+
+        // TODO: handle parameters
+
+        if (p.lexer.next() != .rparen) {
+            std.log.err("expected ')' after parameter list, got {s}", .{@tagName(p.lexer.peek())});
+            return error.MissingClosingParenthesis;
+        }
+
+        const block_stmt = try p.parseBlock();
+
+        const block_ptr = try p.allocator.create(Block);
+        errdefer p.allocator.destroy(block_ptr);
+
+        switch (block_stmt.*) {
+            .block => |*blk| {
+                block_ptr.* = Block{
+                    .statements = blk.statements,
+                    .environment = blk.environment,
+                };
+
+                blk.statements = std.array_list.Managed(*Statement).init(p.allocator);
+                blk.environment = std.StringHashMap(f64).init(p.allocator);
+            },
+            else => {
+                p.allocator.destroy(block_ptr);
+                p.allocator.destroy(block_stmt);
+                return error.ParseError;
+            },
+        }
+
+        const function_declaration = try p.allocator.create(Statement);
+        function_declaration.* = Statement{ .function_declaration = .{
+            .ident = ident,
+            .block = block_ptr,
+        } };
+
+        p.allocator.destroy(block_stmt);
+
+        return function_declaration;
     }
 };

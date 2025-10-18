@@ -16,6 +16,7 @@ pub const Lexeme = union(enum) {
     rbrace: u8,
     bang: u8,
     let: void,
+    function: void,
     eol: void,
     eof: void,
 
@@ -86,6 +87,9 @@ pub const Lexer = struct {
     fn isKeyword(ident: []const u8) ?Lexeme {
         if (std.mem.eql(u8, ident, "let")) {
             return Lexeme{ .let = {} };
+        }
+        if (std.mem.eql(u8, ident, "fn")) {
+            return Lexeme{ .function = {} };
         }
         return null;
     }
