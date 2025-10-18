@@ -12,6 +12,8 @@ pub const ParseError = error{
     MissingOpeningBrace,
     MissingClosingParenthesis,
     MissingOpeningParenthesis,
+    MissingParameter,
+    MissingComma,
 
     InvalidPrefixOperator,
     InvalidInfixOperator,
@@ -333,7 +335,31 @@ pub const Parser = struct {
             return error.MissingOpeningParenthesis;
         }
 
-        // TODO: handle parameters
+        var parameters = std.array_list.Managed([]const u8).init(p.allocator);
+
+        while (true) {
+            const param_lex = p.lexer.next();
+
+            if (param_lex != .ident) {
+                std.log.err("expected parameter identifier, got {s}", .{@tagName(param_lex)});
+                return error.MissingParameter;
+            }
+
+            const parameter_name = try p.allocator.dupe(u8, param_lex.ident);
+            try parameters.append(parameter_name);
+
+            const comma_lex = p.lexer.peek();
+
+            // WARN: POSSIBLE INFINITE LOOP IF NO ')' PRESENT
+            if (comma_lex == .rparen) {
+                break;
+            }
+
+            if (comma_lex != .comma) {
+                std.log.err("expected comma after parameter, got {s}", .{@tagName(comma_lex)});
+                return error.MissingComma;
+            }
+        }
 
         if (p.lexer.next() != .rparen) {
             std.log.err("expected ')' after parameter list, got {s}", .{@tagName(p.lexer.peek())});
@@ -363,9 +389,11 @@ pub const Parser = struct {
         }
 
         const function_declaration = try p.allocator.create(stmt.Statement);
+
         function_declaration.* = stmt.Statement{ .function_declaration = .{
             .ident = ident,
             .block = block_ptr,
+            .parameters = parameters,
         } };
 
         p.allocator.destroy(block_stmt);

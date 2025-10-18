@@ -26,18 +26,19 @@ pub const Block = struct {
     }
 };
 
+pub const Return = struct {
+    func: *Block,
+
+    pub fn deinit(self: *Return, allocator: std.mem.Allocator) void {
+        self.block.deinit();
+        allocator.destroy(self);
+    }
+};
+
 pub const FunctionDeclaration = struct {
     ident: []const u8,
     block: *Block,
-
-    pub fn create(allocator: std.mem.Allocator, name: []const u8, block_stmt: *Block) !*FunctionDeclaration {
-        const func = try allocator.create(FunctionDeclaration);
-        func.* = FunctionDeclaration{
-            .ident = name,
-            .block = block_stmt,
-        };
-        return func;
-    }
+    parameters: std.array_list.Managed([]const u8),
 };
 
 pub const Statement = union(enum) {
@@ -45,6 +46,7 @@ pub const Statement = union(enum) {
     expression: ExpressionStatement,
     block: Block,
     function_declaration: FunctionDeclaration,
+    // ret: Return,
 
     pub fn deinit(self: *Statement, allocator: std.mem.Allocator) void {
         switch (self.*) {
@@ -59,9 +61,13 @@ pub const Statement = union(enum) {
             },
             .block => |*block| block.deinit(allocator),
             .function_declaration => |function_declaration| {
+                // for (function_declaration.parameters) |parameter| {
+                //     allocator.free(parameter);
+                // }
                 function_declaration.block.deinit(allocator);
                 allocator.destroy(function_declaration.block);
             },
+            // .ret => |ret| ret.deinit(allocator),
         }
     }
 };

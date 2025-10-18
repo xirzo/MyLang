@@ -14,8 +14,7 @@ pub fn executeStatement(statement: *stmt.Statement, program: *prog.Program) Exec
         .expression => |_| {},
         .block => |*block| try executeBlock(block, program),
         .function_declaration => |*function_declaration| {
-            const func = try stmt.FunctionDeclaration.create(program.allocator, function_declaration.ident, function_declaration.block);
-            try program.registerFunction(func);
+            try program.registerFunction(function_declaration);
         },
     }
 }

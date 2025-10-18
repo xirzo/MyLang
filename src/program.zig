@@ -23,7 +23,7 @@ pub const Program = struct {
             .allocator = allocator,
             .evaluator = undefined,
         };
-        program.evaluator = ev.Evaluator.init(&program.environment);
+        program.evaluator = ev.Evaluator.init(&program.environment, &program.functions);
         return program;
     }
 
