@@ -16,5 +16,5 @@ test "declare a function" {
 
     try program.execute();
 
-    // try std.testing.expect(value == 5.0);
+    try std.testing.expect(program.getFunction("test") != null);
 }
