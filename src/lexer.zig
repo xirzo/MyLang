@@ -15,6 +15,7 @@ pub const Lexeme = union(enum) {
     lbrace: u8,
     rbrace: u8,
     bang: u8,
+    comma: u8,
     let: void,
     function: void,
     eol: void,
@@ -129,6 +130,7 @@ pub const Lexer = struct {
             '{' => Lexeme{ .lbrace = l.cur_char },
             '}' => Lexeme{ .rbrace = l.cur_char },
             '!' => Lexeme{ .bang = l.cur_char },
+            ',' => Lexeme{ .comma = l.cur_char },
             '\n' => Lexeme{ .eol = {} },
             0 => Lexeme{ .eof = {} },
             else => blk: {
