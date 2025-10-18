@@ -7,6 +7,28 @@ const Program = @import("statement.zig").Program;
 const assert = std.debug.assert;
 const BinaryOperator = @import("expression.zig").BinaryOperator;
 
+pub const ParseError = error{
+    UnexpectedToken,
+    UnexpectedEOF,
+    MissingClosingBrace,
+    MissingOpeningBrace,
+    MissingClosingParenthesis,
+    MissingOpeningParenthesis,
+
+    InvalidPrefixOperator,
+    InvalidInfixOperator,
+    InvalidPostfixOperator,
+    BadExpressionLexeme,
+
+    ExpectedIdentifier,
+    ExpectedAssignment,
+    ExpectedSemicolon,
+
+    OutOfMemory,
+
+    ParseError,
+};
+
 pub const Parser = struct {
     lexer: Lexer,
     allocator: std.mem.Allocator,
@@ -18,7 +40,7 @@ pub const Parser = struct {
         };
     }
 
-    pub fn parse(p: *Parser) !Program {
+    pub fn parse(p: *Parser) ParseError!Program {
         var program = Program.init(p.allocator);
 
         while (true) {
@@ -77,7 +99,7 @@ pub const Parser = struct {
         };
     }
 
-    fn expression(p: *Parser, min_bp: u8) !*Expression {
+    fn expression(p: *Parser, min_bp: u8) ParseError!*Expression {
         const lex: Lexeme = p.lexer.next();
 
         var lhs: *Expression = switch (lex) {
@@ -110,7 +132,7 @@ pub const Parser = struct {
                     }
                 } else {
                     std.log.err("bad lexeme for expression parse {any}\n", .{lex});
-                    return error.ParseError;
+                    return error.BadExpressionLexeme;
                 }
             },
         };
@@ -170,14 +192,16 @@ pub const Parser = struct {
         return lhs;
     }
 
-    pub fn parseStatement(p: *Parser) !?*Statement {
+    pub fn parseStatement(p: *Parser) ParseError!?*Statement {
         const tok = p.lexer.peek();
 
         return switch (tok) {
             .let => blk: {
+                // TODO: move p.lexer.next() into parseLet
                 _ = p.lexer.next();
-                break :blk try p.parseLetStatement();
+                break :blk try p.parseLet();
             },
+            .lbrace => try p.parseBlock(),
             else => blk: {
                 if (tok == .semicolon or tok == .eol or tok == .eof) {
                     return null;
@@ -191,12 +215,12 @@ pub const Parser = struct {
         };
     }
 
-    fn parseLetStatement(p: *Parser) !*Statement {
+    fn parseLet(p: *Parser) ParseError!*Statement {
         const ident_lex = p.lexer.next();
 
         if (ident_lex != .ident) {
             std.log.err("expected identifier after 'let', got {any}", .{ident_lex});
-            return error.ParseError;
+            return error.ExpectedIdentifier;
         }
 
         const var_name = ident_lex.ident;
@@ -206,7 +230,7 @@ pub const Parser = struct {
         if (equal_lex != .assign) {
             std.log.err("expected '=' after variable name, got {any}", .{equal_lex});
             p.allocator.free(name_copy);
-            return error.ParseError;
+            return error.ExpectedAssignment;
         }
 
         const value = try p.parseExpression();
@@ -221,5 +245,59 @@ pub const Parser = struct {
         };
 
         return let_stmt;
+    }
+
+    pub fn parseBlock(p: *Parser) ParseError!*Statement {
+        if (p.lexer.peek() != .lbrace) {
+            std.log.err("expected '{{' at start of block, got {s}", .{@tagName(p.lexer.peek())});
+            return error.MissingOpeningBrace;
+        }
+
+        _ = p.lexer.next();
+
+        var block_statements = std.array_list.Managed(*Statement).init(p.allocator);
+        var block_environment = std.StringHashMap(f64).init(p.allocator);
+
+        errdefer {
+            for (block_statements.items) |stmt| {
+                stmt.deinit(p.allocator);
+                p.allocator.destroy(stmt);
+            }
+            block_statements.deinit();
+            block_environment.deinit();
+        }
+
+        while (p.lexer.peek() != .rbrace) {
+            if (p.lexer.peek() == .eof) {
+                std.log.err("unexpected end of file while parsing block", .{});
+                return error.UnexpectedEOF;
+            }
+
+            if (p.lexer.peek() == .eol) {
+                _ = p.lexer.next();
+                continue;
+            }
+
+            if (try p.parseStatement()) |stmt| {
+                try block_statements.append(stmt);
+            }
+
+            const next_tok = p.lexer.peek();
+
+            if (next_tok == .semicolon or next_tok == .eol) {
+                _ = p.lexer.next();
+            }
+        }
+
+        _ = p.lexer.next();
+
+        const block_stmt = try p.allocator.create(Statement);
+
+        block_stmt.* = Statement{ .block = .{
+            .statements = block_statements,
+            .environment = block_environment,
+        } };
+
+        return block_stmt;
     }
 };

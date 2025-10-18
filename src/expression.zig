@@ -1,5 +1,12 @@
 const std = @import("std");
 
+pub const EvaluationError = error{
+    UndefinedVariable,
+    DivisionByZero,
+    UnsupportedOperator,
+    OutOfMemory,
+};
+
 pub const Constant = struct {
     value: f64,
 };
@@ -38,7 +45,7 @@ pub const Expression = union(enum) {
         }
     }
 
-    pub fn evaluate(self: *Expression, env: *std.StringHashMap(f64)) !f64 {
+    pub fn evaluate(self: *Expression, env: *std.StringHashMap(f64)) EvaluationError!f64 {
         return switch (self.*) {
             .constant => |a| a.value,
             .variable => |vrbl| env.get(vrbl.name) orelse error.UndefinedVariable,

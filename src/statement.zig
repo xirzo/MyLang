@@ -1,6 +1,11 @@
 const std = @import("std");
 const Lexeme = @import("lexer.zig").Lexeme;
 const Expression = @import("expression.zig").Expression;
+const EvaluationError = @import("expression.zig").EvaluationError;
+
+pub const ExecutionError = EvaluationError || error{
+    VariableNotFound,
+};
 
 pub const Program = struct {
     allocator: std.mem.Allocator,
@@ -55,9 +60,19 @@ pub const ExpressionStatement = struct {
     expression: *Expression,
 };
 
+// pub const FunctionDeclaration = struct {
+//     identifier: *Expression,
+// };
+
+pub const Block = struct {
+    statements: std.array_list.Managed(*Statement),
+    environment: std.StringHashMap(f64),
+};
+
 pub const Statement = union(enum) {
     let: Let,
     expression: ExpressionStatement,
+    block: Block,
 
     pub fn deinit(self: *Statement, allocator: std.mem.Allocator) void {
         switch (self.*) {
@@ -70,16 +85,30 @@ pub const Statement = union(enum) {
                 expr_stmt.expression.deinit(allocator);
                 allocator.destroy(expr_stmt.expression);
             },
+            .block => |*block| {
+                for (block.statements.items) |block_statement| {
+                    block_statement.deinit(allocator);
+                    allocator.destroy(block_statement);
+                }
+
+                block.statements.deinit();
+                block.environment.deinit();
+            },
         }
     }
 
-    pub fn execute(self: *const Statement, environment: *std.StringHashMap(f64)) !void {
+    pub fn execute(self: *Statement, environment: *std.StringHashMap(f64)) ExecutionError!void {
         switch (self.*) {
             .let => |let_stmt| {
                 const value = try let_stmt.value.evaluate(environment);
                 try environment.put(let_stmt.name, value);
             },
             .expression => |_| {},
+            .block => |*block| {
+                for (block.statements.items) |block_statement| {
+                    try block_statement.execute(&block.environment);
+                }
+            },
         }
     }
 };
