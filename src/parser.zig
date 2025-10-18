@@ -86,6 +86,12 @@ pub const Parser = struct {
                 expr_node.* = Expression{ .constant = .{ .value = num } };
                 break :blk expr_node;
             },
+            .ident => |name| blk: {
+                const name_copy = try p.allocator.dupe(u8, name);
+                const expr_node: *Expression = try p.allocator.create(Expression);
+                expr_node.* = Expression{ .variable = .{ .name = name_copy } };
+                break :blk expr_node;
+            },
             .lparen => blk: {
                 const lhs_expr = try p.expression(0);
                 assert(p.lexer.next() == .rparen);
