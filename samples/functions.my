@@ -1,0 +1,5 @@
+fn test() {
+    ret 5;
+}
+
+let x = test();

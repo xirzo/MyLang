@@ -18,6 +18,7 @@ pub const Lexeme = union(enum) {
     comma: u8,
     let: void,
     function: void,
+    ret: void,
     eol: void,
     eof: void,
 
@@ -91,6 +92,10 @@ pub const Lexer = struct {
         }
         if (std.mem.eql(u8, ident, "fn")) {
             return Lexeme{ .function = {} };
+        }
+
+        if (std.mem.eql(u8, ident, "ret")) {
+            return Lexeme{ .ret = {} };
         }
         return null;
     }
