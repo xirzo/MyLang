@@ -1,9 +1,8 @@
 const std = @import("std");
-const Lexeme = @import("lexer.zig").Lexeme;
-const Expression = @import("expression.zig").Expression;
-const EvaluationError = @import("expression.zig").EvaluationError;
+const e = @import("expression.zig");
+const ev = @import("evaluator.zig");
 
-pub const ExecutionError = EvaluationError || error{
+pub const ExecutionError = ev.EvaluationError || error{
     VariableNotFound,
 };
 
@@ -12,14 +11,18 @@ pub const Program = struct {
     statements: std.array_list.Managed(*Statement),
     environment: std.StringHashMap(f64),
     functions: std.StringHashMap(*FunctionDeclaration),
+    evaluator: ev.Evaluator,
 
     pub fn init(allocator: std.mem.Allocator) Program {
-        return Program{
+        var program = Program{
             .statements = std.array_list.Managed(*Statement).init(allocator),
             .environment = std.StringHashMap(f64).init(allocator),
             .functions = std.StringHashMap(*FunctionDeclaration).init(allocator),
             .allocator = allocator,
+            .evaluator = undefined,
         };
+        program.evaluator = ev.Evaluator.init(&program.environment);
+        return program;
     }
 
     pub fn deinit(self: *Program) void {
@@ -70,11 +73,11 @@ pub const Program = struct {
 
 pub const Let = struct {
     name: []const u8,
-    value: *Expression,
+    value: *e.Expression,
 };
 
 pub const ExpressionStatement = struct {
-    expression: *Expression,
+    expression: *e.Expression,
 };
 
 pub const Block = struct {
@@ -140,7 +143,7 @@ pub const Statement = union(enum) {
     pub fn execute(self: *Statement, program: *Program) ExecutionError!void {
         switch (self.*) {
             .let => |let_stmt| {
-                const value = try let_stmt.value.evaluate(&program.environment);
+                const value = try program.evaluator.evaluate(let_stmt.value);
                 try program.environment.put(let_stmt.name, value);
             },
             .expression => |_| {},
