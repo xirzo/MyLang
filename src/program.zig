@@ -36,12 +36,6 @@ pub const Program = struct {
             std.debug.print("Deinited statement\n", .{});
         }
 
-        var func_it = self.functions.iterator();
-
-        while (func_it.next()) |entry| {
-            self.allocator.destroy(entry.value_ptr.*);
-        }
-
         self.statements.deinit();
         self.environment.deinit();
         self.functions.deinit();
