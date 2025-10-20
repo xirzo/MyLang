@@ -41,6 +41,16 @@ pub const FunctionDeclaration = struct {
     ident: []const u8,
     block: *Block,
     parameters: std.array_list.Managed([]const u8),
+
+    pub fn deinit(self: *FunctionDeclaration, allocator: std.mem.Allocator) void {
+        for (self.parameters.items) |param_name| {
+            allocator.free(param_name);
+        }
+
+        self.parameters.deinit();
+        self.block.deinit(allocator);
+        allocator.destroy(self.block);
+    }
 };
 
 pub const Statement = union(enum) {
@@ -52,24 +62,27 @@ pub const Statement = union(enum) {
 
     pub fn deinit(self: *Statement, allocator: std.mem.Allocator) void {
         switch (self.*) {
-            .let => |let_stmt| {
+            .let => |*let_stmt| {
+                allocator.free(let_stmt.name);
                 let_stmt.value.deinit(allocator);
                 allocator.destroy(let_stmt.value);
-                allocator.free(let_stmt.name);
             },
-            .expression => |expr_stmt| {
+            .expression => |*expr_stmt| {
                 expr_stmt.expression.deinit(allocator);
                 allocator.destroy(expr_stmt.expression);
             },
-            .block => |*block| block.deinit(allocator),
-            .function_declaration => |function_declaration| {
-                // for (function_declaration.parameters) |parameter| {
-                //     allocator.free(parameter);
-                // }
-                function_declaration.block.deinit(allocator);
-                allocator.destroy(function_declaration.block);
+            .block => |*block| {
+                block.deinit(allocator);
             },
-            .ret => |*ret| ret.deinit(allocator),
+            .function_declaration => |*function_declaration| {
+                function_declaration.deinit(allocator);
+            },
+            .ret => |*ret_stmt| {
+                if (ret_stmt.value) |value| {
+                    value.deinit(allocator);
+                    allocator.destroy(value);
+                }
+            },
         }
     }
 };

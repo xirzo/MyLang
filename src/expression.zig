@@ -18,14 +18,21 @@ pub const Variable = struct {
 pub const FunctionCall = struct {
     function_name: []const u8,
     parameters: std.array_list.Managed(*Expression),
-    declaration: *s.FunctionDeclaration,
+
+    pub fn deinit(self: *FunctionCall, allocator: std.mem.Allocator) void {
+        for (self.parameters.items) |param| {
+            param.deinit(allocator);
+            allocator.destroy(param);
+        }
+        self.parameters.deinit();
+    }
 };
 
 pub const Expression = union(enum) {
     constant: Constant,
     variable: Variable,
     binary_operator: BinaryOperator,
-    // function_call: FunctionCall,
+    function_call: FunctionCall,
 
     pub fn deinit(self: *Expression, allocator: std.mem.Allocator) void {
         switch (self.*) {
@@ -43,10 +50,7 @@ pub const Expression = union(enum) {
                     allocator.destroy(rhs);
                 }
             },
-            // .function_call => |*function_call| {
-            //     function_call.parameters.deinit();
-            //     allocator.free(function_call.function_name);
-            // },
+            .function_call => |*function_call| function_call.deinit(allocator),
         }
     }
 };

@@ -12,6 +12,7 @@ test "declare an empty function" {
     var parser: Parser = Parser.init(lexer, std.testing.allocator);
 
     var program = try parser.parse();
+    defer std.testing.allocator.destroy(program);
     defer program.deinit();
 
     try program.execute();
@@ -30,6 +31,7 @@ test "declare a function with return statement" {
     var parser: Parser = Parser.init(lexer, std.testing.allocator);
 
     var program = try parser.parse();
+    defer std.testing.allocator.destroy(program);
     defer program.deinit();
 
     try program.execute();
@@ -40,7 +42,7 @@ test "declare a function with return statement" {
 test "call a function with value" {
     const src =
         \\ fn test() {
-        \\   return 5;
+        \\   ret 5;
         \\ }
         \\ let x = test();
     ;
@@ -49,6 +51,7 @@ test "call a function with value" {
     var parser: Parser = Parser.init(lexer, std.testing.allocator);
 
     var program = try parser.parse();
+    defer std.testing.allocator.destroy(program);
     defer program.deinit();
 
     try program.execute();

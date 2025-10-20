@@ -3,10 +3,9 @@ const e = @import("expression.zig");
 const ev = @import("evaluator.zig");
 const stmt = @import("statement.zig");
 const exec = @import("executor.zig");
+const errors = @import("errors.zig");
 
-pub const ExecutionError = ev.EvaluationError || error{
-    VariableNotFound,
-};
+pub const ExecutionError = errors.ExecutionError;
 
 pub const Program = struct {
     allocator: std.mem.Allocator,
@@ -14,11 +13,11 @@ pub const Program = struct {
     environment: std.StringHashMap(f64),
     functions: std.StringHashMap(*stmt.FunctionDeclaration),
     evaluator: ev.Evaluator,
-    // TODO: change f64 to value union
+    // TODO: replace with value union
     ret_value: ?*f64,
 
     pub fn init(allocator: std.mem.Allocator) Program {
-        var program = Program{
+        return Program{
             .statements = std.array_list.Managed(*stmt.Statement).init(allocator),
             .environment = std.StringHashMap(f64).init(allocator),
             .functions = std.StringHashMap(*stmt.FunctionDeclaration).init(allocator),
@@ -26,8 +25,10 @@ pub const Program = struct {
             .evaluator = undefined,
             .ret_value = null,
         };
-        program.evaluator = ev.Evaluator.init(&program.environment, &program.functions);
-        return program;
+    }
+
+    pub fn initEvaluator(self: *Program) void {
+        self.evaluator = ev.Evaluator.init(self, &self.environment, &self.functions);
     }
 
     pub fn deinit(self: *Program) void {
@@ -42,6 +43,10 @@ pub const Program = struct {
         self.statements.deinit();
         self.environment.deinit();
         self.functions.deinit();
+
+        if (self.ret_value) |ret_val| {
+            self.allocator.destroy(ret_val);
+        }
     }
 
     pub fn execute(self: *Program) !void {
@@ -51,7 +56,9 @@ pub const Program = struct {
     }
 
     pub fn registerFunction(self: *Program, func_decl: *stmt.FunctionDeclaration) !void {
+        std.debug.print("Registering function: {s}\n", .{func_decl.ident});
         try self.functions.put(func_decl.ident, func_decl);
+        std.debug.print("Functions count after registration: {d}\n", .{self.functions.count()});
     }
 
     pub fn getFunction(self: *Program, name: []const u8) ?*stmt.FunctionDeclaration {
