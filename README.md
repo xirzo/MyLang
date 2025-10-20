@@ -1,23 +1,50 @@
 This is a simple interpreter written in [Zig](https://ziglang.org) in order to learn it. It utilizes [Pratt parsing](https://en.wikipedia.org/wiki/Operator-precedence_parser) technique. Currently it only parses only expressions.
 
-## Current usage
+## Build
+
+Clone the repository
+```sh
+git https://github.com/xirzo/mylang && cd mylang
+```
+
+Build the interpreter
+
+```sh
+zig build
+```
+
+Get into `bin` directory
+
+```sh
+cd ./zig-out/bin
+```
+
+Run the executable
 
 ```sh
 ./mylang sample.my
 ```
 
-## Need to do
+### sample.my
 
-### Parsing
+```
+fn sample() {
+    ret 5;
+}
 
-- [x] parse let statements
-- [x] parse infix operators
-- [x] parse prefix operators
-- [x] parse postfix operators
+let x = sample();
+```
 
-### Evaluation
+## Features
 
-- [] add functions
+- [x] blocks
+- [x] function declarations
+- [x] function calls 
+- [x] let statements
+- [x] return statements
+- [x] infix operators
+- [x] prefix operators
+- [x] postfix operators
 
 ## Sources
 
