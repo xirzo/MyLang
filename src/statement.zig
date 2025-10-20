@@ -1,85 +1,88 @@
 const std = @import("std");
-const Lexeme = @import("lexer.zig").Lexeme;
-const Expression = @import("expression.zig").Expression;
+const e = @import("expression.zig");
+const prog = @import("program.zig");
 
-pub const Program = struct {
-    allocator: std.mem.Allocator,
+pub const Let = struct {
+    name: []const u8,
+    value: *e.Expression,
+};
+
+pub const ExpressionStatement = struct {
+    expression: *e.Expression,
+};
+
+pub const Block = struct {
     statements: std.array_list.Managed(*Statement),
     environment: std.StringHashMap(f64),
 
-    pub fn init(allocator: std.mem.Allocator) Program {
-        return Program{
-            .statements = std.array_list.Managed(*Statement).init(allocator),
-            .environment = std.StringHashMap(f64).init(allocator),
-            .allocator = allocator,
-        };
-    }
-
-    pub fn deinit(self: *Program) void {
-        std.debug.print("Statements count: {d}\n", .{self.statements.items.len});
-
-        for (self.statements.items) |stmt| {
-            stmt.deinit(self.allocator);
-            self.allocator.destroy(stmt);
-            std.debug.print("Deinited statement\n", .{});
+    pub fn deinit(self: *Block, allocator: std.mem.Allocator) void {
+        for (self.statements.items) |block_statement| {
+            block_statement.deinit(allocator);
+            allocator.destroy(block_statement);
         }
 
         self.statements.deinit();
         self.environment.deinit();
     }
+};
 
-    pub fn execute(self: *Program) !void {
-        for (self.statements.items) |stmt| {
-            try stmt.execute(&self.environment);
-        }
-    }
+pub const Return = struct {
+    value: ?*e.Expression,
 
-    pub fn printEnvironment(self: *const Program) void {
-        std.debug.print("Environment state:\n", .{});
-        var it = self.environment.iterator();
-        while (it.next()) |entry| {
-            std.debug.print("  {s} = {d}\n", .{ entry.key_ptr.*, entry.value_ptr.* });
-        }
-        if (self.environment.count() == 0) {
-            std.debug.print("  (empty)\n", .{});
+    pub fn deinit(self: *Return, allocator: std.mem.Allocator) void {
+        if (self.value) |val| {
+            val.deinit(allocator);
+            allocator.destroy(val);
         }
     }
 };
 
-pub const Let = struct {
-    name: []const u8,
-    value: *Expression,
-};
+pub const FunctionDeclaration = struct {
+    ident: []const u8,
+    block: *Block,
+    parameters: std.array_list.Managed([]const u8),
 
-pub const ExpressionStatement = struct {
-    expression: *Expression,
+    pub fn deinit(self: *FunctionDeclaration, allocator: std.mem.Allocator) void {
+        for (self.parameters.items) |param_name| {
+            allocator.free(param_name);
+        }
+
+        self.parameters.deinit();
+        self.block.deinit(allocator);
+        allocator.destroy(self.block);
+    }
 };
 
 pub const Statement = union(enum) {
     let: Let,
     expression: ExpressionStatement,
+    block: Block,
+    function_declaration: FunctionDeclaration,
+    ret: Return,
 
     pub fn deinit(self: *Statement, allocator: std.mem.Allocator) void {
         switch (self.*) {
-            .let => |let_stmt| {
+            .let => |*let_stmt| {
+                allocator.free(let_stmt.name);
                 let_stmt.value.deinit(allocator);
                 allocator.destroy(let_stmt.value);
-                allocator.free(let_stmt.name);
             },
-            .expression => |expr_stmt| {
+            .expression => |*expr_stmt| {
                 expr_stmt.expression.deinit(allocator);
                 allocator.destroy(expr_stmt.expression);
             },
-        }
-    }
-
-    pub fn execute(self: *const Statement, environment: *std.StringHashMap(f64)) !void {
-        switch (self.*) {
-            .let => |let_stmt| {
-                const value = try let_stmt.value.evaluate(environment);
-                try environment.put(let_stmt.name, value);
+            .block => |*block| {
+                block.deinit(allocator);
             },
-            .expression => |_| {},
+            .function_declaration => |*function_declaration| {
+                function_declaration.deinit(allocator);
+            },
+            .ret => |*ret_stmt| {
+                if (ret_stmt.value) |value| {
+                    value.deinit(allocator);
+                    allocator.destroy(value);
+                }
+            },
         }
     }
 };

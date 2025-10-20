@@ -1,25 +1,51 @@
 const std = @import("std");
-const Lexer = @import("lexer.zig").Lexer;
-const Lexeme = @import("lexer.zig").Lexeme;
-const Expression = @import("expression.zig").Expression;
-const Statement = @import("statement.zig").Statement;
-const Program = @import("statement.zig").Program;
+const lex = @import("lexer.zig");
+const e = @import("expression.zig");
+const pg = @import("program.zig");
+const stmt = @import("statement.zig");
 const assert = std.debug.assert;
-const BinaryOperator = @import("expression.zig").BinaryOperator;
+
+pub const ParseError = error{
+    UnexpectedToken,
+    UnexpectedEOF,
+    MissingClosingBrace,
+    MissingOpeningBrace,
+    MissingClosingParenthesis,
+    MissingOpeningParenthesis,
+    MissingParameter,
+    MissingComma,
+
+    InvalidPrefixOperator,
+    InvalidInfixOperator,
+    InvalidPostfixOperator,
+    BadExpressionLexeme,
+
+    ExpectedIdentifier,
+    ExpectedAssignment,
+    ExpectedSemicolon,
+    ExpectedRParen,
+    ExpectedCommaOrRParen,
+
+    OutOfMemory,
+    ParseError,
+};
 
 pub const Parser = struct {
-    lexer: Lexer,
+    lexer: lex.Lexer,
     allocator: std.mem.Allocator,
 
-    pub fn init(l: Lexer, allocator: std.mem.Allocator) Parser {
+    pub fn init(l: lex.Lexer, allocator: std.mem.Allocator) Parser {
         return Parser{
             .lexer = l,
             .allocator = allocator,
         };
     }
 
-    pub fn parse(p: *Parser) !Program {
-        var program = Program.init(p.allocator);
+    pub fn parse(p: *Parser) ParseError!*pg.Program {
+        var program = try p.allocator.create(pg.Program);
+        program.* = pg.Program.init(p.allocator);
+
+        std.debug.print("start parsing\n", .{});
 
         while (true) {
             const tok = p.lexer.peek();
@@ -33,9 +59,9 @@ pub const Parser = struct {
                 continue;
             }
 
-            if (try p.parseStatement()) |stmt| {
-                std.debug.print("Parsed statement\n", .{});
-                try program.statements.append(stmt);
+            if (try p.parseStatement()) |statement| {
+                try program.statements.append(statement);
+                std.debug.print("parsed statement\n", .{});
             } else {
                 _ = p.lexer.next();
             }
@@ -47,10 +73,11 @@ pub const Parser = struct {
             }
         }
 
+        program.initEvaluator();
         return program;
     }
 
-    pub fn parseExpression(p: *Parser) !*Expression {
+    pub fn parseExpression(p: *Parser) !*e.Expression {
         return try p.expression(0);
     }
 
@@ -77,13 +104,61 @@ pub const Parser = struct {
         };
     }
 
-    fn expression(p: *Parser, min_bp: u8) !*Expression {
-        const lex: Lexeme = p.lexer.next();
+    fn expression(p: *Parser, min_bp: u8) ParseError!*e.Expression {
+        const lex_item: lex.Lexeme = p.lexer.next();
 
-        var lhs: *Expression = switch (lex) {
+        var lhs: *e.Expression = switch (lex_item) {
             .number => |num| blk: {
-                const expr_node: *Expression = try p.allocator.create(Expression);
-                expr_node.* = Expression{ .constant = .{ .value = num } };
+                const expr_node: *e.Expression = try p.allocator.create(e.Expression);
+                expr_node.* = e.Expression{ .constant = .{ .value = num } };
+                break :blk expr_node;
+            },
+            .ident => |name| blk: {
+                if (p.lexer.peek() != .lparen) {
+                    // just a variable
+                    const name_copy = try p.allocator.dupe(u8, name);
+                    const expr_node: *e.Expression = try p.allocator.create(e.Expression);
+                    expr_node.* = e.Expression{ .variable = .{ .name = name_copy } };
+                    break :blk expr_node;
+                }
+
+                _ = p.lexer.next();
+
+                var parameters = std.array_list.Managed(*e.Expression).init(p.allocator);
+
+                if (p.lexer.peek() != .rparen) {
+                    while (true) {
+                        const param_expr = try p.parseExpression();
+                        try parameters.append(param_expr);
+
+                        const next_token = p.lexer.next();
+
+                        if (next_token == .rparen) {
+                            break;
+                        } else if (next_token == .comma) {
+                            continue;
+                        } else {
+                            for (parameters.items) |param| {
+                                param.deinit(p.allocator);
+                                p.allocator.destroy(param);
+                            }
+                            parameters.deinit();
+                            return error.ExpectedCommaOrRParen;
+                        }
+                    }
+                } else {
+                    _ = p.lexer.next();
+                }
+
+                const expr_node = try p.allocator.create(e.Expression);
+
+                expr_node.* = e.Expression{
+                    .function_call = .{
+                        .function_name = name,
+                        .parameters = parameters,
+                    },
+                };
+
                 break :blk expr_node;
             },
             .lparen => blk: {
@@ -92,25 +167,25 @@ pub const Parser = struct {
                 break :blk lhs_expr;
             },
             else => blk: {
-                if (lex.getOperatorChar()) |char| {
+                if (lex_item.getOperatorChar()) |char| {
                     if (prefixBindingPower(char)) |r_bp| {
                         const rhs = try p.expression(r_bp);
-                        const expr_node = try p.allocator.create(Expression);
-                        expr_node.* = Expression{ .binary_operator = .{ .lhs = null, .rhs = rhs, .value = char } };
+                        const expr_node = try p.allocator.create(e.Expression);
+                        expr_node.* = e.Expression{ .binary_operator = .{ .lhs = null, .rhs = rhs, .value = char } };
                         break :blk expr_node;
                     } else {
-                        std.log.err("operator cannot be used as prefix {any}\n", .{lex});
+                        std.log.err("operator cannot be used as prefix {any}\n", .{lex_item});
                         return error.ParseError;
                     }
                 } else {
-                    std.log.err("bad lexeme for expression parse {any}\n", .{lex});
-                    return error.ParseError;
+                    std.log.err("bad lexeme for expression parse {any}\n", .{lex_item});
+                    return error.BadExpressionLexeme;
                 }
             },
         };
 
         while (true) {
-            const oper_lex: Lexeme = p.lexer.peek();
+            const oper_lex: lex.Lexeme = p.lexer.peek();
 
             const oper_char: u8 = switch (oper_lex) {
                 .eof => break,
@@ -128,8 +203,8 @@ pub const Parser = struct {
 
                 _ = p.lexer.next();
 
-                const new_lhs = try p.allocator.create(Expression);
-                new_lhs.* = Expression{ .binary_operator = .{ .lhs = lhs, .rhs = null, .value = oper_char } };
+                const new_lhs = try p.allocator.create(e.Expression);
+                new_lhs.* = e.Expression{ .binary_operator = .{ .lhs = lhs, .rhs = null, .value = oper_char } };
                 lhs = new_lhs;
                 continue;
             }
@@ -146,8 +221,8 @@ pub const Parser = struct {
 
                 const rhs = try p.expression(r_bp);
 
-                const new_lhs = try p.allocator.create(Expression);
-                new_lhs.* = Expression{
+                const new_lhs = try p.allocator.create(e.Expression);
+                new_lhs.* = e.Expression{
                     .binary_operator = .{
                         .value = oper_char,
                         .lhs = lhs,
@@ -164,33 +239,41 @@ pub const Parser = struct {
         return lhs;
     }
 
-    pub fn parseStatement(p: *Parser) !?*Statement {
+    pub fn parseStatement(p: *Parser) ParseError!?*stmt.Statement {
         const tok = p.lexer.peek();
 
+        std.debug.print("got lexeme: {s}\n", .{@tagName(tok)});
+
         return switch (tok) {
-            .let => blk: {
-                _ = p.lexer.next();
-                break :blk try p.parseLetStatement();
-            },
+            .let => try p.parseLet(),
+            .lbrace => try p.parseBlock(),
+            .function => try p.parseFunctionDeclaration(),
+            .ret => try p.parseReturn(),
+            // NOTE: parsing function calls may produce errors when creating expression
+            // statement like:
+            // x + 5 (cause x is ident is goes before 5),
+            // 5 + x should work
             else => blk: {
                 if (tok == .semicolon or tok == .eol or tok == .eof) {
                     return null;
                 }
 
                 const expr_node = try p.parseExpression();
-                const stmt_node = try p.allocator.create(Statement);
-                stmt_node.* = Statement{ .expression = .{ .expression = expr_node } };
+                const stmt_node = try p.allocator.create(stmt.Statement);
+                stmt_node.* = stmt.Statement{ .expression = .{ .expression = expr_node } };
                 break :blk stmt_node;
             },
         };
     }
 
-    fn parseLetStatement(p: *Parser) !*Statement {
+    fn parseLet(p: *Parser) ParseError!*stmt.Statement {
+        _ = p.lexer.next();
+
         const ident_lex = p.lexer.next();
 
         if (ident_lex != .ident) {
             std.log.err("expected identifier after 'let', got {any}", .{ident_lex});
-            return error.ParseError;
+            return error.ExpectedIdentifier;
         }
 
         const var_name = ident_lex.ident;
@@ -200,14 +283,14 @@ pub const Parser = struct {
         if (equal_lex != .assign) {
             std.log.err("expected '=' after variable name, got {any}", .{equal_lex});
             p.allocator.free(name_copy);
-            return error.ParseError;
+            return error.ExpectedAssignment;
         }
 
         const value = try p.parseExpression();
 
-        const let_stmt = try p.allocator.create(Statement);
+        const let_stmt = try p.allocator.create(stmt.Statement);
 
-        let_stmt.* = Statement{
+        let_stmt.* = stmt.Statement{
             .let = .{
                 .name = name_copy,
                 .value = value,
@@ -215,5 +298,173 @@ pub const Parser = struct {
         };
 
         return let_stmt;
+    }
+
+    fn parseBlock(p: *Parser) ParseError!*stmt.Statement {
+        if (p.lexer.peek() != .lbrace) {
+            std.log.err("expected '{{' at start of block, got {s}", .{@tagName(p.lexer.peek())});
+            return error.MissingOpeningBrace;
+        }
+
+        _ = p.lexer.next();
+
+        var block_statements = std.array_list.Managed(*stmt.Statement).init(p.allocator);
+        var block_environment = std.StringHashMap(f64).init(p.allocator);
+
+        errdefer {
+            for (block_statements.items) |statement| {
+                statement.deinit(p.allocator);
+                p.allocator.destroy(statement);
+            }
+            block_statements.deinit();
+            block_environment.deinit();
+        }
+
+        while (p.lexer.peek() != .rbrace) {
+            if (p.lexer.peek() == .eof) {
+                std.log.err("unexpected end of file while parsing block", .{});
+                return error.UnexpectedEOF;
+            }
+
+            if (p.lexer.peek() == .eol) {
+                _ = p.lexer.next();
+                continue;
+            }
+
+            if (try p.parseStatement()) |statement| {
+                try block_statements.append(statement);
+            }
+
+            const next_tok = p.lexer.peek();
+
+            if (next_tok == .semicolon or next_tok == .eol) {
+                _ = p.lexer.next();
+            }
+        }
+
+        _ = p.lexer.next();
+
+        const block_stmt = try p.allocator.create(stmt.Statement);
+
+        block_stmt.* = stmt.Statement{ .block = .{
+            .statements = block_statements,
+            .environment = block_environment,
+        } };
+
+        return block_stmt;
+    }
+
+    fn parseFunctionDeclaration(p: *Parser) ParseError!*stmt.Statement {
+        _ = p.lexer.next();
+
+        const ident_lex = p.lexer.next();
+        if (ident_lex != .ident) {
+            std.log.err("expected identifier after 'fn' keyword, got {s}", .{@tagName(p.lexer.peek())});
+            return error.ExpectedIdentifier;
+        }
+        const ident = ident_lex.ident;
+
+        if (p.lexer.next() != .lparen) {
+            std.log.err("expected '(' after function name, got {s}", .{@tagName(p.lexer.peek())});
+            return error.MissingOpeningParenthesis;
+        }
+
+        var parameters = std.array_list.Managed([]const u8).init(p.allocator);
+
+        if (p.lexer.peek() != .rparen) {
+            while (true) {
+                const param_lex = p.lexer.next();
+
+                if (param_lex != .ident) {
+                    std.log.err("expected parameter identifier, got {s}", .{@tagName(param_lex)});
+                    for (parameters.items) |param_name| {
+                        p.allocator.free(param_name);
+                    }
+                    parameters.deinit();
+                    return error.MissingParameter;
+                }
+
+                const parameter_name = try p.allocator.dupe(u8, param_lex.ident);
+                try parameters.append(parameter_name);
+
+                const next_tok = p.lexer.peek();
+                if (next_tok == .rparen) {
+                    break;
+                } else if (next_tok == .comma) {
+                    _ = p.lexer.next();
+                    continue;
+                } else {
+                    std.log.err("expected comma or ')' after parameter, got {s}", .{@tagName(next_tok)});
+                    for (parameters.items) |param_name| {
+                        p.allocator.free(param_name);
+                    }
+                    parameters.deinit();
+                    return error.MissingComma;
+                }
+            }
+        }
+
+        if (p.lexer.next() != .rparen) {
+            std.log.err("expected ')' after parameter list, got {s}", .{@tagName(p.lexer.peek())});
+            for (parameters.items) |param_name| {
+                p.allocator.free(param_name);
+            }
+            parameters.deinit();
+            return error.MissingClosingParenthesis;
+        }
+
+        const block_stmt = try p.parseBlock();
+
+        const block_ptr = try p.allocator.create(stmt.Block);
+        errdefer p.allocator.destroy(block_ptr);
+
+        switch (block_stmt.*) {
+            .block => |*blk| {
+                block_ptr.* = stmt.Block{
+                    .statements = blk.statements,
+                    .environment = blk.environment,
+                };
+                blk.statements = std.array_list.Managed(*stmt.Statement).init(p.allocator);
+                blk.environment = std.StringHashMap(f64).init(p.allocator);
+            },
+            else => {
+                p.allocator.destroy(block_ptr);
+                p.allocator.destroy(block_stmt);
+                for (parameters.items) |param_name| {
+                    p.allocator.free(param_name);
+                }
+                parameters.deinit();
+                return error.ParseError;
+            },
+        }
+
+        const function_declaration = try p.allocator.create(stmt.Statement);
+
+        function_declaration.* = stmt.Statement{
+            .function_declaration = .{
+                .ident = ident,
+                .block = block_ptr,
+                .parameters = parameters,
+            },
+        };
+
+        p.allocator.destroy(block_stmt);
+
+        return function_declaration;
+    }
+
+    fn parseReturn(self: *Parser) ParseError!*stmt.Statement {
+        _ = self.lexer.next();
+
+        const value = try self.parseExpression();
+
+        const ret_stmt = try self.allocator.create(stmt.Statement);
+        errdefer self.allocator.destroy(ret_stmt);
+
+        ret_stmt.* = .{ .ret = .{
+            .value = value,
+        } };
+
+        return ret_stmt;
     }
 };

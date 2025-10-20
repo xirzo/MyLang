@@ -12,8 +12,13 @@ pub const Lexeme = union(enum) {
     slash: u8,
     lparen: u8,
     rparen: u8,
+    lbrace: u8,
+    rbrace: u8,
     bang: u8,
+    comma: u8,
     let: void,
+    function: void,
+    ret: void,
     eol: void,
     eof: void,
 
@@ -85,6 +90,13 @@ pub const Lexer = struct {
         if (std.mem.eql(u8, ident, "let")) {
             return Lexeme{ .let = {} };
         }
+        if (std.mem.eql(u8, ident, "fn")) {
+            return Lexeme{ .function = {} };
+        }
+
+        if (std.mem.eql(u8, ident, "ret")) {
+            return Lexeme{ .ret = {} };
+        }
         return null;
     }
 
@@ -120,7 +132,10 @@ pub const Lexer = struct {
             '/' => Lexeme{ .slash = l.cur_char },
             '(' => Lexeme{ .lparen = l.cur_char },
             ')' => Lexeme{ .rparen = l.cur_char },
+            '{' => Lexeme{ .lbrace = l.cur_char },
+            '}' => Lexeme{ .rbrace = l.cur_char },
             '!' => Lexeme{ .bang = l.cur_char },
+            ',' => Lexeme{ .comma = l.cur_char },
             '\n' => Lexeme{ .eol = {} },
             0 => Lexeme{ .eof = {} },
             else => blk: {
