@@ -27,11 +27,13 @@ pub const Block = struct {
 };
 
 pub const Return = struct {
-    func: *Block,
+    value: ?*e.Expression,
 
     pub fn deinit(self: *Return, allocator: std.mem.Allocator) void {
-        self.block.deinit();
-        allocator.destroy(self);
+        if (self.value) |val| {
+            val.deinit(allocator);
+            allocator.destroy(val);
+        }
     }
 };
 
@@ -46,7 +48,7 @@ pub const Statement = union(enum) {
     expression: ExpressionStatement,
     block: Block,
     function_declaration: FunctionDeclaration,
-    // ret: Return,
+    ret: Return,
 
     pub fn deinit(self: *Statement, allocator: std.mem.Allocator) void {
         switch (self.*) {
@@ -67,7 +69,7 @@ pub const Statement = union(enum) {
                 function_declaration.block.deinit(allocator);
                 allocator.destroy(function_declaration.block);
             },
-            // .ret => |ret| ret.deinit(allocator),
+            .ret => |*ret| ret.deinit(allocator),
         }
     }
 };

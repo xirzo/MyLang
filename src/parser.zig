@@ -215,6 +215,7 @@ pub const Parser = struct {
             .let => try p.parseLet(),
             .lbrace => try p.parseBlock(),
             .function => try p.parseFunctionDeclaration(),
+            .ret => try p.parseReturn(),
             // NOTE: parsing function calls may produce errors when creating expression
             // statement like:
             // x + 5 (cause x is ident is goes before 5),
@@ -266,7 +267,7 @@ pub const Parser = struct {
         return let_stmt;
     }
 
-    pub fn parseBlock(p: *Parser) ParseError!*stmt.Statement {
+    fn parseBlock(p: *Parser) ParseError!*stmt.Statement {
         if (p.lexer.peek() != .lbrace) {
             std.log.err("expected '{{' at start of block, got {s}", .{@tagName(p.lexer.peek())});
             return error.MissingOpeningBrace;
@@ -320,7 +321,7 @@ pub const Parser = struct {
         return block_stmt;
     }
 
-    pub fn parseFunctionDeclaration(p: *Parser) ParseError!*stmt.Statement {
+    fn parseFunctionDeclaration(p: *Parser) ParseError!*stmt.Statement {
         _ = p.lexer.next();
 
         const ident_lex = p.lexer.next();
@@ -337,27 +338,29 @@ pub const Parser = struct {
 
         var parameters = std.array_list.Managed([]const u8).init(p.allocator);
 
-        while (true) {
-            const param_lex = p.lexer.next();
+        if (p.lexer.peek() != .rparen) {
+            while (true) {
+                const param_lex = p.lexer.next();
 
-            if (param_lex != .ident) {
-                std.log.err("expected parameter identifier, got {s}", .{@tagName(param_lex)});
-                return error.MissingParameter;
-            }
+                if (param_lex != .ident) {
+                    std.log.err("expected parameter identifier, got {s}", .{@tagName(param_lex)});
+                    return error.MissingParameter;
+                }
 
-            const parameter_name = try p.allocator.dupe(u8, param_lex.ident);
-            try parameters.append(parameter_name);
+                const parameter_name = try p.allocator.dupe(u8, param_lex.ident);
+                try parameters.append(parameter_name);
 
-            const comma_lex = p.lexer.peek();
+                const comma_lex = p.lexer.peek();
 
-            // WARN: POSSIBLE INFINITE LOOP IF NO ')' PRESENT
-            if (comma_lex == .rparen) {
-                break;
-            }
+                // WARN: POSSIBLE INFINITE LOOP IF NO ')' PRESENT
+                if (comma_lex == .rparen) {
+                    break;
+                }
 
-            if (comma_lex != .comma) {
-                std.log.err("expected comma after parameter, got {s}", .{@tagName(comma_lex)});
-                return error.MissingComma;
+                if (comma_lex != .comma) {
+                    std.log.err("expected comma after parameter, got {s}", .{@tagName(comma_lex)});
+                    return error.MissingComma;
+                }
             }
         }
 
@@ -377,7 +380,6 @@ pub const Parser = struct {
                     .statements = blk.statements,
                     .environment = blk.environment,
                 };
-
                 blk.statements = std.array_list.Managed(*stmt.Statement).init(p.allocator);
                 blk.environment = std.StringHashMap(f64).init(p.allocator);
             },
@@ -399,5 +401,20 @@ pub const Parser = struct {
         p.allocator.destroy(block_stmt);
 
         return function_declaration;
+    }
+
+    fn parseReturn(self: *Parser) ParseError!*stmt.Statement {
+        _ = self.lexer.next();
+
+        const value = try self.parseExpression();
+
+        const ret_stmt = try self.allocator.create(stmt.Statement);
+        errdefer self.allocator.destroy(ret_stmt);
+
+        ret_stmt.* = .{ .ret = .{
+            .value = value,
+        } };
+
+        return ret_stmt;
     }
 };

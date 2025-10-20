@@ -14,6 +14,8 @@ pub const Program = struct {
     environment: std.StringHashMap(f64),
     functions: std.StringHashMap(*stmt.FunctionDeclaration),
     evaluator: ev.Evaluator,
+    // TODO: change f64 to value union
+    ret_value: ?*f64,
 
     pub fn init(allocator: std.mem.Allocator) Program {
         var program = Program{
@@ -22,6 +24,7 @@ pub const Program = struct {
             .functions = std.StringHashMap(*stmt.FunctionDeclaration).init(allocator),
             .allocator = allocator,
             .evaluator = undefined,
+            .ret_value = null,
         };
         program.evaluator = ev.Evaluator.init(&program.environment, &program.functions);
         return program;
