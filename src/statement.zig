@@ -1,5 +1,6 @@
 const std = @import("std");
 const e = @import("expression.zig");
+const v = @import("value.zig");
 const prog = @import("program.zig");
 
 pub const Let = struct {
@@ -13,7 +14,7 @@ pub const ExpressionStatement = struct {
 
 pub const Block = struct {
     statements: std.array_list.Managed(*Statement),
-    environment: std.StringHashMap(f64),
+    environment: std.StringHashMap(v.Value),
 
     pub fn deinit(self: *Block, allocator: std.mem.Allocator) void {
         for (self.statements.items) |block_statement| {

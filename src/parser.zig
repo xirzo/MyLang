@@ -1,5 +1,6 @@
 const std = @import("std");
 const lex = @import("lexer.zig");
+const v = @import("value.zig");
 const e = @import("expression.zig");
 const pg = @import("program.zig");
 const stmt = @import("statement.zig");
@@ -314,7 +315,7 @@ pub const Parser = struct {
         _ = p.lexer.next();
 
         var block_statements = std.array_list.Managed(*stmt.Statement).init(p.allocator);
-        var block_environment = std.StringHashMap(f64).init(p.allocator);
+        var block_environment = std.StringHashMap(v.Value).init(p.allocator);
 
         errdefer {
             for (block_statements.items) |statement| {
@@ -430,7 +431,7 @@ pub const Parser = struct {
                     .environment = blk.environment,
                 };
                 blk.statements = std.array_list.Managed(*stmt.Statement).init(p.allocator);
-                blk.environment = std.StringHashMap(f64).init(p.allocator);
+                blk.environment = std.StringHashMap(v.Value).init(p.allocator);
             },
             else => {
                 p.allocator.destroy(block_ptr);
