@@ -297,6 +297,7 @@ pub const Parser = struct {
             .lbrace => try p.parseBlock(),
             .function => try p.parseFunctionDeclaration(),
             .ret => try p.parseReturn(),
+            .if_cond => try p.parseIf(),
             // NOTE: parsing function calls may produce errors when creating expression
             // statement like:
             // x + 5 (cause x is ident is goes before 5),
@@ -514,5 +515,36 @@ pub const Parser = struct {
         } };
 
         return ret_stmt;
+    }
+
+    fn parseIf(self: *Parser) ParseError!*stmt.Statement {
+        _ = self.lexer.next();
+
+        const value = try self.parseExpression();
+        const block_stmt = try self.parseBlock();
+
+        const block_ptr = try self.allocator.create(stmt.Block);
+        errdefer self.allocator.destroy(block_ptr);
+
+        switch (block_stmt.*) {
+            .block => |*blk| {
+                block_ptr.* = stmt.Block{
+                    .statements = blk.statements,
+                    .environment = blk.environment,
+                };
+                blk.statements = std.array_list.Managed(*stmt.Statement).init(self.allocator);
+                blk.environment = std.StringHashMap(v.Value).init(self.allocator);
+            },
+            else => {
+                self.allocator.destroy(block_ptr);
+                self.allocator.destroy(block_stmt);
+                return error.ParseError;
+            },
+        }
+
+        const if_stmt = try self.allocator.create(stmt.Statement);
+        if_stmt.* = .{ .if_cond = .{ .body = block_ptr, .condition = value } };
+
+        return if_stmt;
     }
 };

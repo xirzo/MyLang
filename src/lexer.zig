@@ -28,6 +28,7 @@ pub const Lexeme = union(enum) {
     lesseq: void,
     true_literal: void,
     false_literal: void,
+    if_cond: void,
     eol: void,
     eof: void,
 
@@ -123,6 +124,9 @@ pub const Lexer = struct {
         if (std.mem.eql(u8, ident, "false")) {
             return Lexeme{ .false_literal = {} };
         }
+        if (std.mem.eql(u8, ident, "if")) {
+            return Lexeme{ .if_cond = {} };
+        }
         return null;
     }
 
@@ -157,7 +161,7 @@ pub const Lexer = struct {
         return l.src[start_pos..l.cur_pos];
     }
 
-    // TODO: add string parsement
+    // TODO: add string parseTruement
     pub fn next(l: *Lexer) Lexeme {
         l.skipWhitespaces();
 

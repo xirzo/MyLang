@@ -60,6 +60,18 @@ pub const FunctionDeclaration = struct {
     }
 };
 
+pub const If = struct {
+    condition: *e.Expression,
+    body: *Block,
+
+    pub fn deinit(self: *If, allocator: std.mem.Allocator) void {
+        self.condition.deinit(allocator);
+        allocator.destroy(self.condition);
+        self.body.deinit(allocator);
+        allocator.destroy(self.body);
+    }
+};
+
 pub const Statement = union(enum) {
     let: Let,
     expression: ExpressionStatement,
@@ -67,6 +79,7 @@ pub const Statement = union(enum) {
     function_declaration: FunctionDeclaration,
     builtin_function: BuiltinFunction,
     ret: Return,
+    if_cond: If,
 
     pub fn deinit(self: *Statement, allocator: std.mem.Allocator) void {
         switch (self.*) {
@@ -94,6 +107,7 @@ pub const Statement = union(enum) {
                     allocator.destroy(value);
                 }
             },
+            .if_cond => |*if_cond| if_cond.deinit(allocator),
         }
     }
 };

@@ -34,6 +34,7 @@ pub fn executeStatement(statement: *stmt.Statement, program: *prog.Program) Exec
             // try program.builtins.put(builtin_function.name, builtin_fn);
         },
         .ret => |*ret| try executeReturn(ret, program),
+        .if_cond => |*if_cond| try executeIf(if_cond, program),
     }
 }
 
@@ -48,6 +49,24 @@ fn executeReturn(ret: *stmt.Return, program: *prog.Program) ExecutionError!void 
         program.ret_value.* = try program.evaluator.evaluate(val);
         return;
     }
+}
+
+fn executeIf(if_stmt: *stmt.If, program: *prog.Program) ExecutionError!void {
+    const value = try program.evaluator.evaluate(if_stmt.condition);
+
+    const should_execute = switch (value) {
+        .number => |n| n > 0,
+        .string => |str| str.len > 0,
+        .char => |c| c > 0,
+        .boolean => |b| b == true,
+        .none => false,
+    };
+
+    if (!should_execute) {
+        return;
+    }
+
+    try executeBlock(if_stmt.body, program);
 }
 
 pub fn printlnExecutor(program: *prog.Program, args: []const v.Value) ExecutionError!v.Value {
