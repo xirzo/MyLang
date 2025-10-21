@@ -53,171 +53,6 @@ pub const Evaluator = struct {
         };
     }
 
-    fn addValues(allocator: std.mem.Allocator, lhs: v.Value, rhs: v.Value) EvaluationError!v.Value {
-        switch (lhs) {
-            .number => |lnum| {
-                switch (rhs) {
-                    .number => |rnum| return v.Value{ .number = lnum + rnum },
-                    .string => |rstr| {
-                        var buf: [32]u8 = undefined;
-                        const lstr = try std.fmt.bufPrint(&buf, "{d}", .{lnum});
-                        const result = try allocator.alloc(u8, lstr.len + rstr.len);
-                        @memcpy(result[0..lstr.len], lstr);
-                        @memcpy(result[lstr.len..], rstr);
-                        return v.Value{ .string = result };
-                    },
-                    .char => |_| {
-                        return error.TypeMismatch;
-                    },
-                    .none => return lhs,
-                }
-            },
-            .string => |lstr| {
-                switch (rhs) {
-                    .number => |rnum| {
-                        var buf: [32]u8 = undefined;
-                        const rstr = try std.fmt.bufPrint(&buf, "{d}", .{rnum});
-                        const result = try allocator.alloc(u8, lstr.len + rstr.len);
-                        @memcpy(result[0..lstr.len], lstr);
-                        @memcpy(result[lstr.len..], rstr);
-                        return v.Value{ .string = result };
-                    },
-                    .string => |rstr| {
-                        const result = try allocator.alloc(u8, lstr.len + rstr.len);
-                        @memcpy(result[0..lstr.len], lstr);
-                        @memcpy(result[lstr.len..], rstr);
-                        return v.Value{ .string = result };
-                    },
-                    .char => |rchar| {
-                        const result = try allocator.alloc(u8, lstr.len + 1);
-                        @memcpy(result[0..lstr.len], lstr);
-                        result[lstr.len] = rchar;
-                        return v.Value{ .string = result };
-                    },
-                    .none => return lhs,
-                }
-            },
-            .char => |lchar| {
-                switch (rhs) {
-                    .number => |_| {
-                        return error.TypeMismatch;
-                    },
-                    .string => |rstr| {
-                        const result = try allocator.alloc(u8, 1 + rstr.len);
-                        result[0] = lchar;
-                        @memcpy(result[1..], rstr);
-                        return v.Value{ .string = result };
-                    },
-                    .char => |rchar| {
-                        const result = try allocator.alloc(u8, 2);
-                        result[0] = lchar;
-                        result[1] = rchar;
-                        return v.Value{ .string = result };
-                    },
-                    .none => return lhs,
-                }
-            },
-            .none => return rhs,
-        }
-    }
-
-    fn subtractValues(lhs: v.Value, rhs: v.Value) EvaluationError!v.Value {
-        switch (lhs) {
-            .number => |lnum| {
-                switch (rhs) {
-                    .number => |rnum| return v.Value{ .number = lnum - rnum },
-                    else => return error.TypeMismatch,
-                }
-            },
-            else => return error.TypeMismatch,
-        }
-    }
-
-    fn multiplyValues(allocator: std.mem.Allocator, lhs: v.Value, rhs: v.Value) EvaluationError!v.Value {
-        switch (lhs) {
-            .number => |lnum| {
-                switch (rhs) {
-                    .number => |rnum| return v.Value{ .number = lnum * rnum },
-                    .string => |rstr| {
-                        if (lnum < 0 or lnum != @trunc(lnum))
-                            return error.InvalidMultiplication;
-
-                        const repeat = @as(usize, @intFromFloat(lnum));
-
-                        if (repeat == 0)
-                            return v.Value{ .string = try allocator.alloc(u8, 0) };
-
-                        const result = try allocator.alloc(u8, rstr.len * repeat);
-                        var i: usize = 0;
-                        while (i < repeat) : (i += 1) {
-                            @memcpy(result[i * rstr.len ..][0..rstr.len], rstr);
-                        }
-                        return v.Value{ .string = result };
-                    },
-                    else => return error.TypeMismatch,
-                }
-            },
-            .string => |lstr| {
-                switch (rhs) {
-                    .number => |rnum| {
-                        if (rnum < 0 or rnum != @trunc(rnum))
-                            return error.InvalidMultiplication;
-
-                        const repeat = @as(usize, @intFromFloat(rnum));
-
-                        if (repeat == 0)
-                            return v.Value{ .string = try allocator.alloc(u8, 0) };
-
-                        const result = try allocator.alloc(u8, lstr.len * repeat);
-
-                        var i: usize = 0;
-
-                        while (i < repeat) : (i += 1) {
-                            @memcpy(result[i * lstr.len ..][0..lstr.len], lstr);
-                        }
-                        return v.Value{ .string = result };
-                    },
-                    else => return error.TypeMismatch,
-                }
-            },
-            else => return error.TypeMismatch,
-        }
-    }
-
-    fn divideValues(lhs: v.Value, rhs: v.Value) EvaluationError!v.Value {
-        switch (lhs) {
-            .number => |lnum| {
-                switch (rhs) {
-                    .number => |rnum| {
-                        if (rnum == 0) return error.DivisionByZero;
-                        return v.Value{ .number = lnum / rnum };
-                    },
-                    else => return error.TypeMismatch,
-                }
-            },
-            else => return error.TypeMismatch,
-        }
-    }
-
-    fn factorialValue(val: v.Value) EvaluationError!v.Value {
-        switch (val) {
-            .number => |num| {
-                if (num < 0 or num != @trunc(num)) return error.InvalidFactorial;
-
-                var result: f64 = 1;
-                var i: usize = 2;
-                const n = @as(usize, @intFromFloat(num));
-
-                while (i <= n) : (i += 1) {
-                    result *= @as(f64, @floatFromInt(i));
-                }
-
-                return v.Value{ .number = result };
-            },
-            else => return error.TypeMismatch,
-        }
-    }
-
     fn evaluateFunctionCall(self: *Evaluator, function_call: *e.FunctionCall) EvaluationError!v.Value {
         var iter = self.functions.iterator();
 
@@ -278,4 +113,169 @@ fn factorial(n: v.Value) f64 {
     }
 
     return fact;
+}
+
+fn addValues(allocator: std.mem.Allocator, lhs: v.Value, rhs: v.Value) EvaluationError!v.Value {
+    switch (lhs) {
+        .number => |lnum| {
+            switch (rhs) {
+                .number => |rnum| return v.Value{ .number = lnum + rnum },
+                .string => |rstr| {
+                    var buf: [32]u8 = undefined;
+                    const lstr = try std.fmt.bufPrint(&buf, "{d}", .{lnum});
+                    const result = try allocator.alloc(u8, lstr.len + rstr.len);
+                    @memcpy(result[0..lstr.len], lstr);
+                    @memcpy(result[lstr.len..], rstr);
+                    return v.Value{ .string = result };
+                },
+                .char => |_| {
+                    return error.TypeMismatch;
+                },
+                .none => return lhs,
+            }
+        },
+        .string => |lstr| {
+            switch (rhs) {
+                .number => |rnum| {
+                    var buf: [32]u8 = undefined;
+                    const rstr = try std.fmt.bufPrint(&buf, "{d}", .{rnum});
+                    const result = try allocator.alloc(u8, lstr.len + rstr.len);
+                    @memcpy(result[0..lstr.len], lstr);
+                    @memcpy(result[lstr.len..], rstr);
+                    return v.Value{ .string = result };
+                },
+                .string => |rstr| {
+                    const result = try allocator.alloc(u8, lstr.len + rstr.len);
+                    @memcpy(result[0..lstr.len], lstr);
+                    @memcpy(result[lstr.len..], rstr);
+                    return v.Value{ .string = result };
+                },
+                .char => |rchar| {
+                    const result = try allocator.alloc(u8, lstr.len + 1);
+                    @memcpy(result[0..lstr.len], lstr);
+                    result[lstr.len] = rchar;
+                    return v.Value{ .string = result };
+                },
+                .none => return lhs,
+            }
+        },
+        .char => |lchar| {
+            switch (rhs) {
+                .number => |_| {
+                    return error.TypeMismatch;
+                },
+                .string => |rstr| {
+                    const result = try allocator.alloc(u8, 1 + rstr.len);
+                    result[0] = lchar;
+                    @memcpy(result[1..], rstr);
+                    return v.Value{ .string = result };
+                },
+                .char => |rchar| {
+                    const result = try allocator.alloc(u8, 2);
+                    result[0] = lchar;
+                    result[1] = rchar;
+                    return v.Value{ .string = result };
+                },
+                .none => return lhs,
+            }
+        },
+        .none => return rhs,
+    }
+}
+
+fn subtractValues(lhs: v.Value, rhs: v.Value) EvaluationError!v.Value {
+    switch (lhs) {
+        .number => |lnum| {
+            switch (rhs) {
+                .number => |rnum| return v.Value{ .number = lnum - rnum },
+                else => return error.TypeMismatch,
+            }
+        },
+        else => return error.TypeMismatch,
+    }
+}
+
+fn multiplyValues(allocator: std.mem.Allocator, lhs: v.Value, rhs: v.Value) EvaluationError!v.Value {
+    switch (lhs) {
+        .number => |lnum| {
+            switch (rhs) {
+                .number => |rnum| return v.Value{ .number = lnum * rnum },
+                .string => |rstr| {
+                    if (lnum < 0 or lnum != @trunc(lnum))
+                        return error.InvalidMultiplication;
+
+                    const repeat = @as(usize, @intFromFloat(lnum));
+
+                    if (repeat == 0)
+                        return v.Value{ .string = try allocator.alloc(u8, 0) };
+
+                    const result = try allocator.alloc(u8, rstr.len * repeat);
+                    var i: usize = 0;
+                    while (i < repeat) : (i += 1) {
+                        @memcpy(result[i * rstr.len ..][0..rstr.len], rstr);
+                    }
+                    return v.Value{ .string = result };
+                },
+                else => return error.TypeMismatch,
+            }
+        },
+        .string => |lstr| {
+            switch (rhs) {
+                .number => |rnum| {
+                    if (rnum < 0 or rnum != @trunc(rnum))
+                        return error.InvalidMultiplication;
+
+                    const repeat = @as(usize, @intFromFloat(rnum));
+
+                    if (repeat == 0)
+                        return v.Value{ .string = try allocator.alloc(u8, 0) };
+
+                    const result = try allocator.alloc(u8, lstr.len * repeat);
+
+                    var i: usize = 0;
+
+                    while (i < repeat) : (i += 1) {
+                        @memcpy(result[i * lstr.len ..][0..lstr.len], lstr);
+                    }
+                    return v.Value{ .string = result };
+                },
+                else => return error.TypeMismatch,
+            }
+        },
+        else => return error.TypeMismatch,
+    }
+}
+
+fn divideValues(lhs: v.Value, rhs: v.Value) EvaluationError!v.Value {
+    switch (lhs) {
+        .number => |lnum| {
+            switch (rhs) {
+                .number => |rnum| {
+                    if (rnum == 0) return error.DivisionByZero;
+                    return v.Value{ .number = lnum / rnum };
+                },
+                else => return error.TypeMismatch,
+            }
+        },
+        else => return error.TypeMismatch,
+    }
+}
+
+fn factorialValue(val: v.Value) EvaluationError!v.Value {
+    switch (val) {
+        .number => |num| {
+            if (num < 0 or num != @trunc(num)) return error.InvalidFactorial;
+
+            var result: f64 = 1;
+            var i: usize = 2;
+            const n = @as(usize, @intFromFloat(num));
+
+            while (i <= n) : (i += 1) {
+                result *= @as(f64, @floatFromInt(i));
+            }
+
+            return v.Value{ .number = result };
+        },
+        else => return error.TypeMismatch,
+    }
 }
