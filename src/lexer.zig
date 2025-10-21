@@ -20,6 +20,12 @@ pub const Lexeme = union(enum) {
     let: void,
     function: void,
     ret: void,
+    eq: void,
+    noteq: void,
+    greater: void,
+    greatereq: void,
+    less: void,
+    lesseq: void,
     eol: void,
     eof: void,
 
@@ -30,6 +36,18 @@ pub const Lexeme = union(enum) {
             .minus => |char| char,
             .slash => |char| char,
             .bang => |char| char,
+            else => null,
+        };
+    }
+
+    pub fn getComparisonOp(lex: *const Lexeme) ?[]const u8 {
+        return switch (lex.*) {
+            .eq => "==",
+            .noteq => "!=",
+            .greater => ">",
+            .greatereq => ">=",
+            .less => "<",
+            .lesseq => "<=",
             else => null,
         };
     }
@@ -139,7 +157,6 @@ pub const Lexer = struct {
         const lexeme = switch (l.cur_char) {
             '+' => Lexeme{ .plus = l.cur_char },
             '-' => Lexeme{ .minus = l.cur_char },
-            '=' => Lexeme{ .assign = l.cur_char },
             ';' => Lexeme{ .semicolon = l.cur_char },
             '*' => Lexeme{ .asterisk = l.cur_char },
             '/' => Lexeme{ .slash = l.cur_char },
@@ -147,10 +164,37 @@ pub const Lexer = struct {
             ')' => Lexeme{ .rparen = l.cur_char },
             '{' => Lexeme{ .lbrace = l.cur_char },
             '}' => Lexeme{ .rbrace = l.cur_char },
-            '!' => Lexeme{ .bang = l.cur_char },
             ',' => Lexeme{ .comma = l.cur_char },
             '\n' => Lexeme{ .eol = {} },
             '"' => Lexeme{ .string = l.parseString() },
+            '!' => blk: {
+                if (l.peekChar() == '=') {
+                    l.readChar();
+                    break :blk Lexeme{ .noteq = {} };
+                }
+                break :blk Lexeme{ .bang = l.cur_char };
+            },
+            '>' => blk: {
+                if (l.peekChar() == '=') {
+                    l.readChar();
+                    break :blk Lexeme{ .greatereq = {} };
+                }
+                break :blk Lexeme{ .greater = {} };
+            },
+            '<' => blk: {
+                if (l.peekChar() == '=') {
+                    l.readChar();
+                    break :blk Lexeme{ .lesseq = {} };
+                }
+                break :blk Lexeme{ .less = {} };
+            },
+            '=' => blk: {
+                if (l.peekChar() == '=') {
+                    l.readChar();
+                    break :blk Lexeme{ .eq = {} };
+                }
+                break :blk Lexeme{ .assign = l.cur_char };
+            },
             0 => Lexeme{ .eof = {} },
             else => blk: {
                 if (Lexer.isLetter(l.cur_char)) {
