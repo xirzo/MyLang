@@ -113,6 +113,11 @@ pub const Parser = struct {
                 expr_node.* = e.Expression{ .constant = .{ .value = .{ .number = num } } };
                 break :blk expr_node;
             },
+            .string => |str| blk: {
+                const expr_node: *e.Expression = try p.allocator.create(e.Expression);
+                expr_node.* = e.Expression{ .constant = .{ .value = .{ .string = str } } };
+                break :blk expr_node;
+            },
             .ident => |name| blk: {
                 if (p.lexer.peek() != .lparen) {
                     // just a variable
