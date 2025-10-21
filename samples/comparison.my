@@ -1,1 +1,17 @@
-let x = 5 > 1;
+let x = 1 > 0;
+println(x);
+
+let x = 1 < 0;
+println(x);
+
+let x = 1 == 0;
+println(x);
+
+let x = 1 != 0;
+println(x);
+
+let x = 1 >= 0;
+println(x);
+
+let x = 1 <= 0;
+println(x);

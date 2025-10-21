@@ -27,6 +27,7 @@ pub const Evaluator = struct {
             .variable => |vrbl| self.evaluateVariable(vrbl),
             .binary_operator => |o| self.evaluateBinaryOperator(o),
             .function_call => |*function_call| self.evaluateFunctionCall(function_call),
+            .comparison_operator => |*comp| self.evaluateComparison(comp.*),
         };
     }
 
@@ -115,6 +116,13 @@ pub const Evaluator = struct {
 
         return self.program.ret_value.*;
     }
+
+    fn evaluateComparison(self: *Evaluator, comp: e.ComparisonOperator) EvaluationError!v.Value {
+        const lhs = try self.evaluate(comp.lhs);
+        const rhs = try self.evaluate(comp.rhs);
+
+        return compareValues(lhs, rhs, comp.op);
+    }
 };
 
 fn factorial(n: v.Value) f64 {
@@ -145,6 +153,9 @@ fn addValues(allocator: std.mem.Allocator, lhs: v.Value, rhs: v.Value) Evaluatio
                 .char => |_| {
                     return error.TypeMismatch;
                 },
+                .boolean => |_| {
+                    return error.TypeMismatch;
+                },
                 .none => return lhs,
             }
         },
@@ -170,6 +181,13 @@ fn addValues(allocator: std.mem.Allocator, lhs: v.Value, rhs: v.Value) Evaluatio
                     result[lstr.len] = rchar;
                     return v.Value{ .string = result };
                 },
+                .boolean => |rbool| {
+                    const rstr = if (rbool) "true" else "false";
+                    const result = try allocator.alloc(u8, lstr.len + rstr.len);
+                    @memcpy(result[0..lstr.len], lstr);
+                    @memcpy(result[lstr.len..], rstr);
+                    return v.Value{ .string = result };
+                },
                 .none => return lhs,
             }
         },
@@ -189,6 +207,30 @@ fn addValues(allocator: std.mem.Allocator, lhs: v.Value, rhs: v.Value) Evaluatio
                     result[0] = lchar;
                     result[1] = rchar;
                     return v.Value{ .string = result };
+                },
+                .boolean => |_| {
+                    return error.TypeMismatch;
+                },
+                .none => return lhs,
+            }
+        },
+        .boolean => |lbool| {
+            switch (rhs) {
+                .number => |_| {
+                    return error.TypeMismatch;
+                },
+                .string => |rstr| {
+                    const lstr = if (lbool) "true" else "false";
+                    const result = try allocator.alloc(u8, lstr.len + rstr.len);
+                    @memcpy(result[0..lstr.len], lstr);
+                    @memcpy(result[lstr.len..], rstr);
+                    return v.Value{ .string = result };
+                },
+                .char => |_| {
+                    return error.TypeMismatch;
+                },
+                .boolean => |_| {
+                    return error.TypeMismatch;
                 },
                 .none => return lhs,
             }
@@ -292,4 +334,69 @@ fn factorialValue(val: v.Value) EvaluationError!v.Value {
         },
         else => return error.TypeMismatch,
     }
+}
+
+fn compareValues(lhs: v.Value, rhs: v.Value, op: []const u8) EvaluationError!v.Value {
+    const result = switch (lhs) {
+        .number => |lnum| blk: {
+            const rnum = switch (rhs) {
+                .number => |n| n,
+                else => return error.TypeMismatch,
+            };
+
+            break :blk if (std.mem.eql(u8, op, "=="))
+                lnum == rnum
+            else if (std.mem.eql(u8, op, "!="))
+                lnum != rnum
+            else if (std.mem.eql(u8, op, ">"))
+                lnum > rnum
+            else if (std.mem.eql(u8, op, ">="))
+                lnum >= rnum
+            else if (std.mem.eql(u8, op, "<"))
+                lnum < rnum
+            else if (std.mem.eql(u8, op, "<="))
+                lnum <= rnum
+            else
+                return error.UnsupportedOperator;
+        },
+        .string => |lstr| blk: {
+            const rstr = switch (rhs) {
+                .string => |ss| ss,
+                else => return error.TypeMismatch,
+            };
+
+            const cmp = std.mem.order(u8, lstr, rstr);
+
+            break :blk if (std.mem.eql(u8, op, "=="))
+                cmp == .eq
+            else if (std.mem.eql(u8, op, "!="))
+                cmp != .eq
+            else if (std.mem.eql(u8, op, ">"))
+                cmp == .gt
+            else if (std.mem.eql(u8, op, ">="))
+                cmp != .lt
+            else if (std.mem.eql(u8, op, "<"))
+                cmp == .lt
+            else if (std.mem.eql(u8, op, "<="))
+                cmp != .gt
+            else
+                return error.UnsupportedOperator;
+        },
+        .boolean => |lbool| blk: {
+            const rbool = switch (rhs) {
+                .boolean => |b| b,
+                else => return error.TypeMismatch,
+            };
+
+            break :blk if (std.mem.eql(u8, op, "=="))
+                lbool == rbool
+            else if (std.mem.eql(u8, op, "!="))
+                lbool != rbool
+            else
+                return error.UnsupportedOperator;
+        },
+        else => return error.TypeMismatch,
+    };
+
+    return v.Value{ .boolean = result };
 }

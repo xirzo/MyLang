@@ -26,6 +26,8 @@ pub const Lexeme = union(enum) {
     greatereq: void,
     less: void,
     lesseq: void,
+    true_literal: void,
+    false_literal: void,
     eol: void,
     eof: void,
 
@@ -112,9 +114,14 @@ pub const Lexer = struct {
         if (std.mem.eql(u8, ident, "fn")) {
             return Lexeme{ .function = {} };
         }
-
         if (std.mem.eql(u8, ident, "ret")) {
             return Lexeme{ .ret = {} };
+        }
+        if (std.mem.eql(u8, ident, "true")) {
+            return Lexeme{ .true_literal = {} };
+        }
+        if (std.mem.eql(u8, ident, "false")) {
+            return Lexeme{ .false_literal = {} };
         }
         return null;
     }

@@ -98,6 +98,13 @@ pub const Parser = struct {
         };
     }
 
+    fn comparisonBindingPower(lexem: lex.Lexeme) ?struct { u8, u8 } {
+        return switch (lexem) {
+            .eq, .noteq, .greater, .greatereq, .less, .lesseq => .{ 2, 3 },
+            else => null,
+        };
+    }
+
     fn postfixBindingPower(op: u8) ?u8 {
         return switch (op) {
             '!' => 7,
@@ -117,6 +124,16 @@ pub const Parser = struct {
             .string => |str| blk: {
                 const expr_node: *e.Expression = try p.allocator.create(e.Expression);
                 expr_node.* = e.Expression{ .constant = .{ .value = .{ .string = str } } };
+                break :blk expr_node;
+            },
+            .true_literal => blk: {
+                const expr_node: *e.Expression = try p.allocator.create(e.Expression);
+                expr_node.* = e.Expression{ .constant = .{ .value = .{ .boolean = true } } };
+                break :blk expr_node;
+            },
+            .false_literal => blk: {
+                const expr_node: *e.Expression = try p.allocator.create(e.Expression);
+                expr_node.* = e.Expression{ .constant = .{ .value = .{ .boolean = false } } };
                 break :blk expr_node;
             },
             .ident => |name| blk: {
@@ -192,6 +209,31 @@ pub const Parser = struct {
 
         while (true) {
             const oper_lex: lex.Lexeme = p.lexer.peek();
+
+            if (oper_lex.getComparisonOp()) |comp_op| {
+                if (comparisonBindingPower(oper_lex)) |bp| {
+                    const l_bp = bp[0];
+                    const r_bp = bp[1];
+
+                    if (min_bp > l_bp) {
+                        break;
+                    }
+
+                    _ = p.lexer.next();
+                    const rhs = try p.expression(r_bp);
+
+                    const new_lhs = try p.allocator.create(e.Expression);
+                    new_lhs.* = e.Expression{
+                        .comparison_operator = .{
+                            .op = comp_op,
+                            .lhs = lhs,
+                            .rhs = rhs,
+                        },
+                    };
+                    lhs = new_lhs;
+                    continue;
+                }
+            }
 
             const oper_char: u8 = switch (oper_lex) {
                 .eof => break,
