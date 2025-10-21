@@ -1,5 +1,6 @@
 const std = @import("std");
 const lex = @import("lexer.zig");
+const v = @import("value.zig");
 const e = @import("expression.zig");
 const pg = @import("program.zig");
 const stmt = @import("statement.zig");
@@ -43,7 +44,7 @@ pub const Parser = struct {
 
     pub fn parse(p: *Parser) ParseError!*pg.Program {
         var program = try p.allocator.create(pg.Program);
-        program.* = pg.Program.init(p.allocator);
+        program.* = try pg.Program.init(p.allocator);
 
         std.debug.print("start parsing\n", .{});
 
@@ -110,7 +111,12 @@ pub const Parser = struct {
         var lhs: *e.Expression = switch (lex_item) {
             .number => |num| blk: {
                 const expr_node: *e.Expression = try p.allocator.create(e.Expression);
-                expr_node.* = e.Expression{ .constant = .{ .value = num } };
+                expr_node.* = e.Expression{ .constant = .{ .value = .{ .number = num } } };
+                break :blk expr_node;
+            },
+            .string => |str| blk: {
+                const expr_node: *e.Expression = try p.allocator.create(e.Expression);
+                expr_node.* = e.Expression{ .constant = .{ .value = .{ .string = str } } };
                 break :blk expr_node;
             },
             .ident => |name| blk: {
@@ -309,7 +315,7 @@ pub const Parser = struct {
         _ = p.lexer.next();
 
         var block_statements = std.array_list.Managed(*stmt.Statement).init(p.allocator);
-        var block_environment = std.StringHashMap(f64).init(p.allocator);
+        var block_environment = std.StringHashMap(v.Value).init(p.allocator);
 
         errdefer {
             for (block_statements.items) |statement| {
@@ -425,7 +431,7 @@ pub const Parser = struct {
                     .environment = blk.environment,
                 };
                 blk.statements = std.array_list.Managed(*stmt.Statement).init(p.allocator);
-                blk.environment = std.StringHashMap(f64).init(p.allocator);
+                blk.environment = std.StringHashMap(v.Value).init(p.allocator);
             },
             else => {
                 p.allocator.destroy(block_ptr);
@@ -442,7 +448,7 @@ pub const Parser = struct {
 
         function_declaration.* = stmt.Statement{
             .function_declaration = .{
-                .ident = ident,
+                .name = ident,
                 .block = block_ptr,
                 .parameters = parameters,
             },

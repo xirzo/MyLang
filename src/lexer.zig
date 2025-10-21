@@ -3,6 +3,7 @@ const std = @import("std");
 pub const Lexeme = union(enum) {
     illegal: void,
     ident: []const u8,
+    string: []const u8,
     assign: u8,
     number: f64,
     semicolon: u8,
@@ -120,6 +121,19 @@ pub const Lexer = struct {
         return l.src[start_pos..l.cur_pos];
     }
 
+    fn parseString(l: *Lexer) []const u8 {
+        const start_pos = l.cur_pos;
+
+        l.readChar();
+
+        while (l.cur_char != '"') {
+            l.readChar();
+        }
+
+        return l.src[start_pos..l.cur_pos];
+    }
+
+    // TODO: add string parsement
     pub fn next(l: *Lexer) Lexeme {
         l.skipWhitespaces();
 
@@ -137,6 +151,7 @@ pub const Lexer = struct {
             '!' => Lexeme{ .bang = l.cur_char },
             ',' => Lexeme{ .comma = l.cur_char },
             '\n' => Lexeme{ .eol = {} },
+            '"' => Lexeme{ .string = l.parseString() },
             0 => Lexeme{ .eof = {} },
             else => blk: {
                 if (Lexer.isLetter(l.cur_char)) {

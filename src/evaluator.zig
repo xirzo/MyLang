@@ -1,6 +1,7 @@
 const std = @import("std");
 const e = @import("expression.zig");
 const ex = @import("executor.zig");
+const v = @import("value.zig");
 const s = @import("statement.zig");
 const prog = @import("program.zig");
 const errors = @import("errors.zig");
@@ -9,10 +10,10 @@ pub const EvaluationError = errors.EvaluationError;
 
 pub const Evaluator = struct {
     program: *prog.Program,
-    environment: *std.StringHashMap(f64),
+    environment: *std.StringHashMap(v.Value),
     functions: *std.StringHashMap(*s.FunctionDeclaration),
 
-    pub fn init(program: *prog.Program, environment: *std.StringHashMap(f64), functions: *std.StringHashMap(*s.FunctionDeclaration)) Evaluator {
+    pub fn init(program: *prog.Program, environment: *std.StringHashMap(v.Value), functions: *std.StringHashMap(*s.FunctionDeclaration)) Evaluator {
         return Evaluator{
             .program = program,
             .environment = environment,
@@ -20,7 +21,7 @@ pub const Evaluator = struct {
         };
     }
 
-    pub fn evaluate(self: *Evaluator, expr: *e.Expression) EvaluationError!f64 {
+    pub fn evaluate(self: *Evaluator, expr: *e.Expression) EvaluationError!v.Value {
         return switch (expr.*) {
             .constant => |a| a.value,
             .variable => |vrbl| self.evaluateVariable(vrbl),
@@ -29,25 +30,44 @@ pub const Evaluator = struct {
         };
     }
 
-    fn evaluateVariable(self: *Evaluator, vrbl: e.Variable) EvaluationError!f64 {
+    fn evaluateVariable(self: *Evaluator, vrbl: e.Variable) EvaluationError!v.Value {
         return self.environment.get(vrbl.name) orelse error.UndefinedVariable;
     }
 
-    fn evaluateBinaryOperator(self: *Evaluator, op: e.BinaryOperator) EvaluationError!f64 {
-        const lhs = if (op.lhs) |l| try self.evaluate(l) else 0;
-        const rhs = if (op.rhs) |r| try self.evaluate(r) else 0;
+    fn evaluateBinaryOperator(self: *Evaluator, op: e.BinaryOperator) EvaluationError!v.Value {
+        const lhs = if (op.lhs) |l| try self.evaluate(l) else {
+            return error.NoLeftExpression;
+        };
+
+        const rhs = if (op.rhs) |r| try self.evaluate(r) else {
+            return error.NoRightExpression;
+        };
 
         return switch (op.value) {
-            '+' => lhs + rhs,
-            '-' => lhs - rhs,
-            '*' => lhs * rhs,
-            '/' => if (rhs == 0) error.DivisionByZero else lhs / rhs,
-            '!' => factorial(lhs),
+            '+' => try addValues(self.program.allocator, lhs, rhs),
+            '-' => try subtractValues(lhs, rhs),
+            '*' => try multiplyValues(self.program.allocator, lhs, rhs),
+            '/' => try divideValues(lhs, rhs),
+            '!' => try factorialValue(lhs),
             else => error.UnsupportedOperator,
         };
     }
 
-    fn evaluateFunctionCall(self: *Evaluator, function_call: *e.FunctionCall) EvaluationError!f64 {
+    fn evaluateFunctionCall(self: *Evaluator, function_call: *e.FunctionCall) EvaluationError!v.Value {
+        if (self.program.builtins.get(function_call.function_name)) |builtin_ptr| {
+            const builtin = builtin_ptr.*;
+
+            var args = std.array_list.Managed(v.Value).init(self.program.allocator);
+            defer args.deinit();
+
+            for (function_call.parameters.items) |param_expr| {
+                const param_value = try self.evaluate(param_expr);
+                try args.append(param_value);
+            }
+
+            return builtin.executor(self.program, args.items);
+        }
+
         var iter = self.functions.iterator();
 
         while (iter.next()) |entry| {
@@ -59,9 +79,9 @@ pub const Evaluator = struct {
             return error.UndefinedFunction;
         };
 
-        std.debug.print("Found function: {s}\n", .{func.ident});
+        std.debug.print("Found function: {s}\n", .{func.name});
 
-        var saved_vars = std.StringHashMap(f64).init(self.environment.allocator);
+        var saved_vars = std.StringHashMap(v.Value).init(self.environment.allocator);
         defer saved_vars.deinit();
 
         var env_iter = self.environment.iterator();
@@ -86,8 +106,6 @@ pub const Evaluator = struct {
 
         try ex.executeStatement(&block_statement, self.program);
 
-        const return_value = if (self.program.ret_value) |ret_val| ret_val.* else 0.0;
-
         self.environment.clearRetainingCapacity();
         var saved_iter = saved_vars.iterator();
 
@@ -95,13 +113,13 @@ pub const Evaluator = struct {
             try self.environment.put(entry.key_ptr.*, entry.value_ptr.*);
         }
 
-        return return_value;
+        return self.program.ret_value.*;
     }
 };
 
-fn factorial(n: f64) f64 {
-    var i: f64 = 1;
-    var fact: f64 = 1;
+fn factorial(n: v.Value) f64 {
+    var i: v.Value = 1;
+    var fact: v.Value = 1;
 
     while (i <= n) {
         fact *= i;
@@ -109,4 +127,169 @@ fn factorial(n: f64) f64 {
     }
 
     return fact;
+}
+
+fn addValues(allocator: std.mem.Allocator, lhs: v.Value, rhs: v.Value) EvaluationError!v.Value {
+    switch (lhs) {
+        .number => |lnum| {
+            switch (rhs) {
+                .number => |rnum| return v.Value{ .number = lnum + rnum },
+                .string => |rstr| {
+                    var buf: [32]u8 = undefined;
+                    const lstr = try std.fmt.bufPrint(&buf, "{d}", .{lnum});
+                    const result = try allocator.alloc(u8, lstr.len + rstr.len);
+                    @memcpy(result[0..lstr.len], lstr);
+                    @memcpy(result[lstr.len..], rstr);
+                    return v.Value{ .string = result };
+                },
+                .char => |_| {
+                    return error.TypeMismatch;
+                },
+                .none => return lhs,
+            }
+        },
+        .string => |lstr| {
+            switch (rhs) {
+                .number => |rnum| {
+                    var buf: [32]u8 = undefined;
+                    const rstr = try std.fmt.bufPrint(&buf, "{d}", .{rnum});
+                    const result = try allocator.alloc(u8, lstr.len + rstr.len);
+                    @memcpy(result[0..lstr.len], lstr);
+                    @memcpy(result[lstr.len..], rstr);
+                    return v.Value{ .string = result };
+                },
+                .string => |rstr| {
+                    const result = try allocator.alloc(u8, lstr.len + rstr.len);
+                    @memcpy(result[0..lstr.len], lstr);
+                    @memcpy(result[lstr.len..], rstr);
+                    return v.Value{ .string = result };
+                },
+                .char => |rchar| {
+                    const result = try allocator.alloc(u8, lstr.len + 1);
+                    @memcpy(result[0..lstr.len], lstr);
+                    result[lstr.len] = rchar;
+                    return v.Value{ .string = result };
+                },
+                .none => return lhs,
+            }
+        },
+        .char => |lchar| {
+            switch (rhs) {
+                .number => |_| {
+                    return error.TypeMismatch;
+                },
+                .string => |rstr| {
+                    const result = try allocator.alloc(u8, 1 + rstr.len);
+                    result[0] = lchar;
+                    @memcpy(result[1..], rstr);
+                    return v.Value{ .string = result };
+                },
+                .char => |rchar| {
+                    const result = try allocator.alloc(u8, 2);
+                    result[0] = lchar;
+                    result[1] = rchar;
+                    return v.Value{ .string = result };
+                },
+                .none => return lhs,
+            }
+        },
+        .none => return rhs,
+    }
+}
+
+fn subtractValues(lhs: v.Value, rhs: v.Value) EvaluationError!v.Value {
+    switch (lhs) {
+        .number => |lnum| {
+            switch (rhs) {
+                .number => |rnum| return v.Value{ .number = lnum - rnum },
+                else => return error.TypeMismatch,
+            }
+        },
+        else => return error.TypeMismatch,
+    }
+}
+
+fn multiplyValues(allocator: std.mem.Allocator, lhs: v.Value, rhs: v.Value) EvaluationError!v.Value {
+    switch (lhs) {
+        .number => |lnum| {
+            switch (rhs) {
+                .number => |rnum| return v.Value{ .number = lnum * rnum },
+                .string => |rstr| {
+                    if (lnum < 0 or lnum != @trunc(lnum))
+                        return error.InvalidMultiplication;
+
+                    const repeat = @as(usize, @intFromFloat(lnum));
+
+                    if (repeat == 0)
+                        return v.Value{ .string = try allocator.alloc(u8, 0) };
+
+                    const result = try allocator.alloc(u8, rstr.len * repeat);
+                    var i: usize = 0;
+                    while (i < repeat) : (i += 1) {
+                        @memcpy(result[i * rstr.len ..][0..rstr.len], rstr);
+                    }
+                    return v.Value{ .string = result };
+                },
+                else => return error.TypeMismatch,
+            }
+        },
+        .string => |lstr| {
+            switch (rhs) {
+                .number => |rnum| {
+                    if (rnum < 0 or rnum != @trunc(rnum))
+                        return error.InvalidMultiplication;
+
+                    const repeat = @as(usize, @intFromFloat(rnum));
+
+                    if (repeat == 0)
+                        return v.Value{ .string = try allocator.alloc(u8, 0) };
+
+                    const result = try allocator.alloc(u8, lstr.len * repeat);
+
+                    var i: usize = 0;
+
+                    while (i < repeat) : (i += 1) {
+                        @memcpy(result[i * lstr.len ..][0..lstr.len], lstr);
+                    }
+                    return v.Value{ .string = result };
+                },
+                else => return error.TypeMismatch,
+            }
+        },
+        else => return error.TypeMismatch,
+    }
+}
+
+fn divideValues(lhs: v.Value, rhs: v.Value) EvaluationError!v.Value {
+    switch (lhs) {
+        .number => |lnum| {
+            switch (rhs) {
+                .number => |rnum| {
+                    if (rnum == 0) return error.DivisionByZero;
+                    return v.Value{ .number = lnum / rnum };
+                },
+                else => return error.TypeMismatch,
+            }
+        },
+        else => return error.TypeMismatch,
+    }
+}
+
+fn factorialValue(val: v.Value) EvaluationError!v.Value {
+    switch (val) {
+        .number => |num| {
+            if (num < 0 or num != @trunc(num)) return error.InvalidFactorial;
+
+            var result: f64 = 1;
+            var i: usize = 2;
+            const n = @as(usize, @intFromFloat(num));
+
+            while (i <= n) : (i += 1) {
+                result *= @as(f64, @floatFromInt(i));
+            }
+
+            return v.Value{ .number = result };
+        },
+        else => return error.TypeMismatch,
+    }
 }

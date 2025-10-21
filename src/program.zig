@@ -1,6 +1,7 @@
 const std = @import("std");
 const e = @import("expression.zig");
 const ev = @import("evaluator.zig");
+const v = @import("value.zig");
 const stmt = @import("statement.zig");
 const exec = @import("executor.zig");
 const errors = @import("errors.zig");
@@ -10,21 +11,29 @@ pub const ExecutionError = errors.ExecutionError;
 pub const Program = struct {
     allocator: std.mem.Allocator,
     statements: std.array_list.Managed(*stmt.Statement),
-    environment: std.StringHashMap(f64),
+    environment: std.StringHashMap(v.Value),
     functions: std.StringHashMap(*stmt.FunctionDeclaration),
+    builtins: std.StringHashMap(*stmt.BuiltinFunction),
     evaluator: ev.Evaluator,
-    // TODO: replace with value union
-    ret_value: ?*f64,
+    ret_value: *v.Value,
 
-    pub fn init(allocator: std.mem.Allocator) Program {
-        return Program{
+    pub fn init(allocator: std.mem.Allocator) !Program {
+        const ret_value = try allocator.create(v.Value);
+        ret_value.* = v.Value{ .none = {} };
+
+        var program = Program{
             .statements = std.array_list.Managed(*stmt.Statement).init(allocator),
-            .environment = std.StringHashMap(f64).init(allocator),
+            .environment = std.StringHashMap(v.Value).init(allocator),
             .functions = std.StringHashMap(*stmt.FunctionDeclaration).init(allocator),
+            .builtins = std.StringHashMap(*stmt.BuiltinFunction).init(allocator),
             .allocator = allocator,
             .evaluator = undefined,
-            .ret_value = null,
+            .ret_value = ret_value,
         };
+
+        try program.registerBuiltins();
+
+        return program;
     }
 
     pub fn initEvaluator(self: *Program) void {
@@ -40,13 +49,30 @@ pub const Program = struct {
             std.debug.print("Deinited statement\n", .{});
         }
 
+        // NOTE: may cause double free, because statements are already destroyed?
+        var builtins_iter = self.builtins.iterator();
+
+        while (builtins_iter.next()) |entry| {
+            self.allocator.free(entry.value_ptr.*.name);
+            self.allocator.destroy(entry.value_ptr.*);
+        }
+
         self.statements.deinit();
         self.environment.deinit();
         self.functions.deinit();
+        self.builtins.deinit();
+        self.allocator.destroy(self.ret_value);
+    }
 
-        if (self.ret_value) |ret_val| {
-            self.allocator.destroy(ret_val);
-        }
+    pub fn registerBuiltins(self: *Program) !void {
+        const println_fn = try self.allocator.create(stmt.BuiltinFunction);
+
+        println_fn.* = .{
+            .name = try self.allocator.dupe(u8, "println"),
+            .executor = exec.printlnExecutor,
+        };
+
+        try self.builtins.put("println", println_fn);
     }
 
     pub fn execute(self: *Program) !void {
@@ -56,8 +82,8 @@ pub const Program = struct {
     }
 
     pub fn registerFunction(self: *Program, func_decl: *stmt.FunctionDeclaration) !void {
-        std.debug.print("Registering function: {s}\n", .{func_decl.ident});
-        try self.functions.put(func_decl.ident, func_decl);
+        std.debug.print("Registering function: {s}\n", .{func_decl.name});
+        try self.functions.put(func_decl.name, func_decl);
         std.debug.print("Functions count after registration: {d}\n", .{self.functions.count()});
     }
 
@@ -65,14 +91,20 @@ pub const Program = struct {
         return self.functions.get(name);
     }
 
-    pub fn printEnvironment(self: *const Program) void {
-        std.debug.print("Environment state:\n", .{});
-        var it = self.environment.iterator();
-        while (it.next()) |entry| {
-            std.debug.print("  {s} = {d}\n", .{ entry.key_ptr.*, entry.value_ptr.* });
-        }
-        if (self.environment.count() == 0) {
-            std.debug.print("  (empty)\n", .{});
-        }
+    pub fn printEnvironment(_: *const Program) void {
+        // std.debug.print("Environment state:\n", .{});
+        //
+        // var it = self.environment.iterator();
+        //
+        // while (it.next()) |entry| {
+        //     switch (entry.value_ptr.*) {
+        //         .number => std.debug.print("  {s} = {d}\n", .{ entry.key_ptr.*, entry.value_ptr.* }),
+        //         else => unreachable,
+        //     }
+        // }
+        //
+        // if (self.environment.count() == 0) {
+        //     std.debug.print("  (empty)\n", .{});
+        // }
     }
 };
