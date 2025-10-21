@@ -63,6 +63,7 @@ pub fn printlnExecutor(program: *prog.Program, args: []const v.Value) ExecutionE
             .number => |n| try writer.interface.print("{}\n", .{n}),
             .string => |str| try writer.interface.print("{s}\n", .{str}),
             .char => |c| try writer.interface.print("{c}\n", .{c}),
+            .boolean => |b| try writer.interface.print("{}\n", .{b}),
             .none => try writer.interface.print("(none)\n", .{}),
         }
     }

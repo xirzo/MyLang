@@ -29,11 +29,18 @@ pub const FunctionCall = struct {
     }
 };
 
+pub const ComparisonOperator = struct {
+    lhs: *Expression,
+    rhs: *Expression,
+    op: []const u8,
+};
+
 pub const Expression = union(enum) {
     constant: Constant,
     variable: Variable,
     binary_operator: BinaryOperator,
     function_call: FunctionCall,
+    comparison_operator: ComparisonOperator,
 
     pub fn deinit(self: *Expression, allocator: std.mem.Allocator) void {
         switch (self.*) {
@@ -52,6 +59,7 @@ pub const Expression = union(enum) {
                 }
             },
             .function_call => |*function_call| function_call.deinit(allocator),
+            .comparison_operator => {},
         }
     }
 };
