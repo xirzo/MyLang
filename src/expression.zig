@@ -1,8 +1,9 @@
 const std = @import("std");
 const s = @import("statement.zig");
+const v = @import("value.zig");
 
 pub const Constant = struct {
-    value: f64,
+    value: v.Value,
 };
 
 pub const BinaryOperator = struct {

@@ -1,6 +1,7 @@
 const std = @import("std");
 const e = @import("expression.zig");
 const ev = @import("evaluator.zig");
+const v = @import("value.zig");
 const stmt = @import("statement.zig");
 const exec = @import("executor.zig");
 const errors = @import("errors.zig");
@@ -10,20 +11,23 @@ pub const ExecutionError = errors.ExecutionError;
 pub const Program = struct {
     allocator: std.mem.Allocator,
     statements: std.array_list.Managed(*stmt.Statement),
-    environment: std.StringHashMap(f64),
+    environment: std.StringHashMap(v.Value),
     functions: std.StringHashMap(*stmt.FunctionDeclaration),
     evaluator: ev.Evaluator,
     // TODO: replace with value union
-    ret_value: ?*f64,
+    ret_value: *v.Value,
 
-    pub fn init(allocator: std.mem.Allocator) Program {
+    pub fn init(allocator: std.mem.Allocator) !Program {
+        const ret_value = try allocator.create(v.Value);
+        ret_value.* = v.Value{ .none = {} };
+
         return Program{
             .statements = std.array_list.Managed(*stmt.Statement).init(allocator),
-            .environment = std.StringHashMap(f64).init(allocator),
+            .environment = std.StringHashMap(v.Value).init(allocator),
             .functions = std.StringHashMap(*stmt.FunctionDeclaration).init(allocator),
             .allocator = allocator,
             .evaluator = undefined,
-            .ret_value = null,
+            .ret_value = ret_value,
         };
     }
 
@@ -43,10 +47,7 @@ pub const Program = struct {
         self.statements.deinit();
         self.environment.deinit();
         self.functions.deinit();
-
-        if (self.ret_value) |ret_val| {
-            self.allocator.destroy(ret_val);
-        }
+        self.allocator.destroy(self.ret_value);
     }
 
     pub fn execute(self: *Program) !void {
@@ -65,14 +66,20 @@ pub const Program = struct {
         return self.functions.get(name);
     }
 
-    pub fn printEnvironment(self: *const Program) void {
-        std.debug.print("Environment state:\n", .{});
-        var it = self.environment.iterator();
-        while (it.next()) |entry| {
-            std.debug.print("  {s} = {d}\n", .{ entry.key_ptr.*, entry.value_ptr.* });
-        }
-        if (self.environment.count() == 0) {
-            std.debug.print("  (empty)\n", .{});
-        }
+    pub fn printEnvironment(_: *const Program) void {
+        // std.debug.print("Environment state:\n", .{});
+        //
+        // var it = self.environment.iterator();
+        //
+        // while (it.next()) |entry| {
+        //     switch (entry.value_ptr.*) {
+        //         .number => std.debug.print("  {s} = {d}\n", .{ entry.key_ptr.*, entry.value_ptr.* }),
+        //         else => unreachable,
+        //     }
+        // }
+        //
+        // if (self.environment.count() == 0) {
+        //     std.debug.print("  (empty)\n", .{});
+        // }
     }
 };

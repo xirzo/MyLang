@@ -43,7 +43,7 @@ pub const Parser = struct {
 
     pub fn parse(p: *Parser) ParseError!*pg.Program {
         var program = try p.allocator.create(pg.Program);
-        program.* = pg.Program.init(p.allocator);
+        program.* = try pg.Program.init(p.allocator);
 
         std.debug.print("start parsing\n", .{});
 
@@ -110,7 +110,7 @@ pub const Parser = struct {
         var lhs: *e.Expression = switch (lex_item) {
             .number => |num| blk: {
                 const expr_node: *e.Expression = try p.allocator.create(e.Expression);
-                expr_node.* = e.Expression{ .constant = .{ .value = num } };
+                expr_node.* = e.Expression{ .constant = .{ .value = .{ .number = num } } };
                 break :blk expr_node;
             },
             .ident => |name| blk: {

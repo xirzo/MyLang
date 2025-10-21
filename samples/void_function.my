@@ -1,0 +1,5 @@
+fn void_function() {
+    return;
+}
+
+void_function();
