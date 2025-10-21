@@ -122,9 +122,8 @@ pub const Lexer = struct {
     }
 
     fn parseString(l: *Lexer) []const u8 {
-        const start_pos = l.cur_pos;
-
         l.readChar();
+        const start_pos = l.cur_pos;
 
         while (l.cur_char != '"') {
             l.readChar();
