@@ -46,7 +46,7 @@ pub const Parser = struct {
         var program = try p.allocator.create(pg.Program);
         program.* = try pg.Program.init(p.allocator);
 
-        std.debug.print("start parsing\n", .{});
+        std.log.debug("start parsing\n", .{});
 
         while (true) {
             const tok = p.lexer.peek();
@@ -62,7 +62,7 @@ pub const Parser = struct {
 
             if (try p.parseStatement()) |statement| {
                 try program.statements.append(statement);
-                std.debug.print("parsed statement\n", .{});
+                std.log.debug("parsed statement\n", .{});
             } else {
                 _ = p.lexer.next();
             }
@@ -248,7 +248,7 @@ pub const Parser = struct {
     pub fn parseStatement(p: *Parser) ParseError!?*stmt.Statement {
         const tok = p.lexer.peek();
 
-        std.debug.print("got lexeme: {s}\n", .{@tagName(tok)});
+        std.log.debug("got lexeme: {s}\n", .{@tagName(tok)});
 
         return switch (tok) {
             .let => try p.parseLet(),

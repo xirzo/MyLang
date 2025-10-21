@@ -57,7 +57,7 @@ test "call a function with value" {
     try program.execute();
 
     const value = program.environment.get("x") orelse {
-        std.debug.print("Variable 'x' not found in environment\n", .{});
+        std.log.debug("Variable 'x' not found in environment\n", .{});
         return error.TestExpectedEqual;
     };
 

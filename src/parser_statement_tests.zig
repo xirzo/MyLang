@@ -14,7 +14,7 @@ test "assign number to a variable" {
     try program.execute();
 
     const value = program.environment.get("x") orelse {
-        std.debug.print("Variable 'x' not found in environment\n", .{});
+        std.log.debug("Variable 'x' not found in environment\n", .{});
         return error.TestExpectedEqual;
     };
 
@@ -35,7 +35,7 @@ test "assign vartiable value to a variable" {
     try program.execute();
 
     const value = program.environment.get("y") orelse {
-        std.debug.print("Variable 'y' not found in environment\n", .{});
+        std.log.debug("Variable 'y' not found in environment\n", .{});
         return error.TestExpectedEqual;
     };
 
@@ -57,7 +57,7 @@ test "assign vartiable value to a variable" {
 //     try program.execute();
 //
 //     const value = program.environment.get("y") orelse {
-//         std.debug.print("Variable 'y' not found in environment\n", .{});
+//         std.log.debug("Variable 'y' not found in environment\n", .{});
 //         return error.TestExpectedEqual;
 //     };
 //

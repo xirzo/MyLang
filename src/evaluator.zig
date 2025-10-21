@@ -71,7 +71,7 @@ pub const Evaluator = struct {
         var iter = self.functions.iterator();
 
         while (iter.next()) |entry| {
-            std.debug.print("Available function: {s}\n", .{entry.key_ptr.*});
+            std.log.debug("Available function: {s}\n", .{entry.key_ptr.*});
         }
 
         const func = self.functions.get(function_call.function_name) orelse {
@@ -79,7 +79,7 @@ pub const Evaluator = struct {
             return error.UndefinedFunction;
         };
 
-        std.debug.print("Found function: {s}\n", .{func.name});
+        std.log.debug("Found function: {s}\n", .{func.name});
 
         var saved_vars = std.StringHashMap(v.Value).init(self.environment.allocator);
         defer saved_vars.deinit();

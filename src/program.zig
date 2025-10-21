@@ -41,12 +41,12 @@ pub const Program = struct {
     }
 
     pub fn deinit(self: *Program) void {
-        std.debug.print("Statements count: {d}\n", .{self.statements.items.len});
+        std.log.debug("Statements count: {d}\n", .{self.statements.items.len});
 
         for (self.statements.items) |stmt_item| {
             stmt_item.deinit(self.allocator);
             self.allocator.destroy(stmt_item);
-            std.debug.print("Deinited statement\n", .{});
+            std.log.debug("Deinited statement\n", .{});
         }
 
         // NOTE: may cause double free, because statements are already destroyed?
@@ -82,9 +82,9 @@ pub const Program = struct {
     }
 
     pub fn registerFunction(self: *Program, func_decl: *stmt.FunctionDeclaration) !void {
-        std.debug.print("Registering function: {s}\n", .{func_decl.name});
+        std.log.debug("Registering function: {s}\n", .{func_decl.name});
         try self.functions.put(func_decl.name, func_decl);
-        std.debug.print("Functions count after registration: {d}\n", .{self.functions.count()});
+        std.log.debug("Functions count after registration: {d}\n", .{self.functions.count()});
     }
 
     pub fn getFunction(self: *Program, name: []const u8) ?*stmt.FunctionDeclaration {
@@ -92,19 +92,19 @@ pub const Program = struct {
     }
 
     pub fn printEnvironment(_: *const Program) void {
-        // std.debug.print("Environment state:\n", .{});
+        // std.log.debug("Environment state:\n", .{});
         //
         // var it = self.environment.iterator();
         //
         // while (it.next()) |entry| {
         //     switch (entry.value_ptr.*) {
-        //         .number => std.debug.print("  {s} = {d}\n", .{ entry.key_ptr.*, entry.value_ptr.* }),
+        //         .number => std.log.debug("  {s} = {d}\n", .{ entry.key_ptr.*, entry.value_ptr.* }),
         //         else => unreachable,
         //     }
         // }
         //
         // if (self.environment.count() == 0) {
-        //     std.debug.print("  (empty)\n", .{});
+        //     std.log.debug("  (empty)\n", .{});
         // }
     }
 };

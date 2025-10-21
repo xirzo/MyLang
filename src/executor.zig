@@ -57,7 +57,7 @@ pub fn printlnExecutor(program: *prog.Program, args: []const v.Value) ExecutionE
     var writer = std.fs.File.writer(std.fs.File.stdout(), &buf);
 
     if (args.len == 0) {
-        std.debug.print("\n", .{});
+        std.log.debug("\n", .{});
     } else {
         switch (args[0]) {
             .number => |n| try writer.interface.print("{}\n", .{n}),
