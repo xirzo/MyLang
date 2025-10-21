@@ -2,6 +2,7 @@ const std = @import("std");
 const e = @import("expression.zig");
 const v = @import("value.zig");
 const prog = @import("program.zig");
+const ex = @import("executor.zig");
 
 pub const Let = struct {
     name: []const u8,
@@ -38,8 +39,13 @@ pub const Return = struct {
     }
 };
 
+pub const BuiltinFunction = struct {
+    name: []const u8,
+    executor: *const fn (program: *prog.Program, args: []const v.Value) ex.ExecutionError!v.Value,
+};
+
 pub const FunctionDeclaration = struct {
-    ident: []const u8,
+    name: []const u8,
     block: *Block,
     parameters: std.array_list.Managed([]const u8),
 
@@ -59,6 +65,7 @@ pub const Statement = union(enum) {
     expression: ExpressionStatement,
     block: Block,
     function_declaration: FunctionDeclaration,
+    builtin_function: BuiltinFunction,
     ret: Return,
 
     pub fn deinit(self: *Statement, allocator: std.mem.Allocator) void {
@@ -77,6 +84,9 @@ pub const Statement = union(enum) {
             },
             .function_declaration => |*function_declaration| {
                 function_declaration.deinit(allocator);
+            },
+            .builtin_function => |*builtin| {
+                allocator.free(builtin.name);
             },
             .ret => |*ret_stmt| {
                 if (ret_stmt.value) |value| {

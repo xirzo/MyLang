@@ -11,6 +11,7 @@ pub const EvaluationError = error{
     VariableNotFound,
     NoLeftExpression,
     NoRightExpression,
+    WriteFailed,
 };
 
 pub const ExecutionError = EvaluationError;

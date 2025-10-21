@@ -448,7 +448,7 @@ pub const Parser = struct {
 
         function_declaration.* = stmt.Statement{
             .function_declaration = .{
-                .ident = ident,
+                .name = ident,
                 .block = block_ptr,
                 .parameters = parameters,
             },

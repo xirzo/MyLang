@@ -54,6 +54,20 @@ pub const Evaluator = struct {
     }
 
     fn evaluateFunctionCall(self: *Evaluator, function_call: *e.FunctionCall) EvaluationError!v.Value {
+        if (self.program.builtins.get(function_call.function_name)) |builtin_ptr| {
+            const builtin = builtin_ptr.*;
+
+            var args = std.array_list.Managed(v.Value).init(self.program.allocator);
+            defer args.deinit();
+
+            for (function_call.parameters.items) |param_expr| {
+                const param_value = try self.evaluate(param_expr);
+                try args.append(param_value);
+            }
+
+            return builtin.executor(self.program, args.items);
+        }
+
         var iter = self.functions.iterator();
 
         while (iter.next()) |entry| {
@@ -65,7 +79,7 @@ pub const Evaluator = struct {
             return error.UndefinedFunction;
         };
 
-        std.debug.print("Found function: {s}\n", .{func.ident});
+        std.debug.print("Found function: {s}\n", .{func.name});
 
         var saved_vars = std.StringHashMap(v.Value).init(self.environment.allocator);
         defer saved_vars.deinit();
