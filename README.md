@@ -33,10 +33,12 @@ fn sample() {
 }
 
 let x = sample();
+println(x);
 ```
 
 ## Features
 
+- [x] built-in functions (e.g. println)
 - [x] blocks
 - [x] function declarations
 - [x] function calls 
