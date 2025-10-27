@@ -1,145 +1,132 @@
 const std = @import("std");
-const Lexer = @import("lexer.zig").Lexer;
-const Lexeme = @import("lexer.zig").Lexeme;
+const mylang = @import("mylang");
 
 test "lex assignment" {
     const src = "int a = 123;";
-    var lexer: Lexer = Lexer.init(src);
+    var lexer = mylang.Lexer.init(src);
 
-    var expected = std.array_list.Managed(Lexeme).init(std.testing.allocator);
+    var expected = std.array_list.Managed(mylang.Lexeme).init(std.testing.allocator);
     defer expected.deinit();
 
-    try expected.append(Lexeme{ .ident = "int" });
-    try expected.append(Lexeme{ .ident = "a" });
-    try expected.append(Lexeme{ .assign = '=' });
-    try expected.append(Lexeme{ .number = 123 });
-    try expected.append(Lexeme{ .semicolon = ';' });
-    try expected.append(Lexeme{ .eof = {} });
+    try expected.append(mylang.Lexeme{ .ident = "int" });
+    try expected.append(mylang.Lexeme{ .ident = "a" });
+    try expected.append(mylang.Lexeme{ .assign = '=' });
+    try expected.append(mylang.Lexeme{ .number = 123 });
+    try expected.append(mylang.Lexeme{ .semicolon = ';' });
+    try expected.append(mylang.Lexeme{ .eof = {} });
 
     for (expected.items) |exp_token| {
         const actual_token = lexer.next();
 
-        // std.debug.print("{any}, {any}\n", .{ @as(std.meta.Tag(Lexeme), exp_token), @as(std.meta.Tag(Lexeme), actual_token) });
-
-        try std.testing.expectEqual(@as(std.meta.Tag(Lexeme), exp_token), @as(std.meta.Tag(Lexeme), actual_token));
+        try std.testing.expectEqual(@as(std.meta.Tag(mylang.Lexeme), exp_token), @as(std.meta.Tag(mylang.Lexeme), actual_token));
         try expect_lexeme_equal(exp_token, actual_token);
     }
 }
 
 test "lex addition" {
     const src = "5 + 5";
-    var lexer: Lexer = Lexer.init(src);
+    var lexer = mylang.Lexer.init(src);
 
-    var expected = std.array_list.Managed(Lexeme).init(std.testing.allocator);
+    var expected = std.array_list.Managed(mylang.Lexeme).init(std.testing.allocator);
     defer expected.deinit();
 
-    try expected.append(Lexeme{ .number = 5 });
-    try expected.append(Lexeme{ .plus = '+' });
-    try expected.append(Lexeme{ .number = 5 });
-    try expected.append(Lexeme{ .eof = {} });
+    try expected.append(mylang.Lexeme{ .number = 5 });
+    try expected.append(mylang.Lexeme{ .plus = '+' });
+    try expected.append(mylang.Lexeme{ .number = 5 });
+    try expected.append(mylang.Lexeme{ .eof = {} });
 
     for (expected.items) |exp_token| {
         const actual_token = lexer.next();
 
-        // std.debug.print("{any}, {any}\n", .{ @as(std.meta.Tag(Lexeme), exp_token), @as(std.meta.Tag(Lexeme), actual_token) });
-
-        try std.testing.expectEqual(@as(std.meta.Tag(Lexeme), exp_token), @as(std.meta.Tag(Lexeme), actual_token));
+        try std.testing.expectEqual(@as(std.meta.Tag(mylang.Lexeme), exp_token), @as(std.meta.Tag(mylang.Lexeme), actual_token));
         try expect_lexeme_equal(exp_token, actual_token);
     }
 }
 
 test "lex multidigit number" {
     const src = "55";
-    var lexer: Lexer = Lexer.init(src);
+    var lexer = mylang.Lexer.init(src);
 
-    var expected = std.array_list.Managed(Lexeme).init(std.testing.allocator);
+    var expected = std.array_list.Managed(mylang.Lexeme).init(std.testing.allocator);
     defer expected.deinit();
 
-    try expected.append(Lexeme{ .number = 55 });
-    try expected.append(Lexeme{ .eof = {} });
+    try expected.append(mylang.Lexeme{ .number = 55 });
+    try expected.append(mylang.Lexeme{ .eof = {} });
 
     for (expected.items) |exp_token| {
         const actual_token = lexer.next();
 
-        // std.debug.print("{any}, {any}\n", .{ @as(std.meta.Tag(Lexeme), exp_token), @as(std.meta.Tag(Lexeme), actual_token) });
-
-        try std.testing.expectEqual(@as(std.meta.Tag(Lexeme), exp_token), @as(std.meta.Tag(Lexeme), actual_token));
+        try std.testing.expectEqual(@as(std.meta.Tag(mylang.Lexeme), exp_token), @as(std.meta.Tag(mylang.Lexeme), actual_token));
         try expect_lexeme_equal(exp_token, actual_token);
     }
 }
 
 test "lex addition no spaces" {
     const src = "5+55";
-    var lexer: Lexer = Lexer.init(src);
+    var lexer = mylang.Lexer.init(src);
 
-    var expected = std.array_list.Managed(Lexeme).init(std.testing.allocator);
+    var expected = std.array_list.Managed(mylang.Lexeme).init(std.testing.allocator);
     defer expected.deinit();
 
-    try expected.append(Lexeme{ .number = 5 });
-    try expected.append(Lexeme{ .plus = '+' });
-    try expected.append(Lexeme{ .number = 55 });
-    try expected.append(Lexeme{ .eof = {} });
+    try expected.append(mylang.Lexeme{ .number = 5 });
+    try expected.append(mylang.Lexeme{ .plus = '+' });
+    try expected.append(mylang.Lexeme{ .number = 55 });
+    try expected.append(mylang.Lexeme{ .eof = {} });
 
     for (expected.items) |exp_token| {
         const actual_token = lexer.next();
 
-        // std.debug.print("{any}, {any}\n", .{ @as(std.meta.Tag(Lexeme), exp_token), @as(std.meta.Tag(Lexeme), actual_token) });
-
-        try std.testing.expectEqual(@as(std.meta.Tag(Lexeme), exp_token), @as(std.meta.Tag(Lexeme), actual_token));
+        try std.testing.expectEqual(@as(std.meta.Tag(mylang.Lexeme), exp_token), @as(std.meta.Tag(mylang.Lexeme), actual_token));
         try expect_lexeme_equal(exp_token, actual_token);
     }
 }
 
 test "lex paren" {
     const src = "2 * (5 + 5)";
-    var lexer: Lexer = Lexer.init(src);
+    var lexer = mylang.Lexer.init(src);
 
-    var expected = std.array_list.Managed(Lexeme).init(std.testing.allocator);
+    var expected = std.array_list.Managed(mylang.Lexeme).init(std.testing.allocator);
     defer expected.deinit();
 
-    try expected.append(Lexeme{ .number = 2 });
-    try expected.append(Lexeme{ .asterisk = '*' });
-    try expected.append(Lexeme{ .lparen = '(' });
-    try expected.append(Lexeme{ .number = 5 });
-    try expected.append(Lexeme{ .plus = '+' });
-    try expected.append(Lexeme{ .number = 5 });
-    try expected.append(Lexeme{ .rparen = ')' });
-    try expected.append(Lexeme{ .eof = {} });
+    try expected.append(mylang.Lexeme{ .number = 2 });
+    try expected.append(mylang.Lexeme{ .asterisk = '*' });
+    try expected.append(mylang.Lexeme{ .lparen = '(' });
+    try expected.append(mylang.Lexeme{ .number = 5 });
+    try expected.append(mylang.Lexeme{ .plus = '+' });
+    try expected.append(mylang.Lexeme{ .number = 5 });
+    try expected.append(mylang.Lexeme{ .rparen = ')' });
+    try expected.append(mylang.Lexeme{ .eof = {} });
 
     for (expected.items) |exp_token| {
         const actual_token = lexer.next();
 
-        // std.debug.print("{any}, {any}\n", .{ @as(std.meta.Tag(Lexeme), exp_token), @as(std.meta.Tag(Lexeme), actual_token) });
-
-        try std.testing.expectEqual(@as(std.meta.Tag(Lexeme), exp_token), @as(std.meta.Tag(Lexeme), actual_token));
+        try std.testing.expectEqual(@as(std.meta.Tag(mylang.Lexeme), exp_token), @as(std.meta.Tag(mylang.Lexeme), actual_token));
         try expect_lexeme_equal(exp_token, actual_token);
     }
 }
 
 test "lex factorial" {
     const src = "5!";
-    var lexer: Lexer = Lexer.init(src);
+    var lexer = mylang.Lexer.init(src);
 
-    var expected = std.array_list.Managed(Lexeme).init(std.testing.allocator);
+    var expected = std.array_list.Managed(mylang.Lexeme).init(std.testing.allocator);
     defer expected.deinit();
 
-    try expected.append(Lexeme{ .number = 5 });
-    try expected.append(Lexeme{ .bang = '!' });
-    try expected.append(Lexeme{ .eof = {} });
+    try expected.append(mylang.Lexeme{ .number = 5 });
+    try expected.append(mylang.Lexeme{ .bang = '!' });
+    try expected.append(mylang.Lexeme{ .eof = {} });
 
     for (expected.items) |exp_token| {
         const actual_token = lexer.next();
 
-        // std.debug.print("{any}, {any}\n", .{ @as(std.meta.Tag(Lexeme), exp_token), @as(std.meta.Tag(Lexeme), actual_token) });
-
-        try std.testing.expectEqual(@as(std.meta.Tag(Lexeme), exp_token), @as(std.meta.Tag(Lexeme), actual_token));
+        try std.testing.expectEqual(@as(std.meta.Tag(mylang.Lexeme), exp_token), @as(std.meta.Tag(mylang.Lexeme), actual_token));
         try expect_lexeme_equal(exp_token, actual_token);
     }
 }
 
-fn expect_lexeme_equal(expected: Lexeme, actual: Lexeme) !void {
-    const tag_expected = @as(std.meta.Tag(Lexeme), expected);
-    const tag_actual = @as(std.meta.Tag(Lexeme), actual);
+fn expect_lexeme_equal(expected: mylang.Lexeme, actual: mylang.Lexeme) !void {
+    const tag_expected = @as(std.meta.Tag(mylang.Lexeme), expected);
+    const tag_actual = @as(std.meta.Tag(mylang.Lexeme), actual);
     try std.testing.expectEqual(tag_expected, tag_actual);
 
     switch (tag_expected) {

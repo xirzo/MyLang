@@ -1,7 +1,7 @@
-if (true) {
+if true {
     println("True");
 }
 
-if (false) {
+if false {
     println("False");
 }

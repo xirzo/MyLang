@@ -1,0 +1,9 @@
+fn fib(n) {
+    if n <= 1 {
+        ret n
+    }
+
+    ret fib(n-1) + fib(n-2)
+}
+
+let x = fib(5)

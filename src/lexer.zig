@@ -94,7 +94,11 @@ pub const Lexer = struct {
     }
 
     fn skipWhitespaces(l: *Lexer) void {
-        while (l.cur_char == ' ' or l.cur_char == '\t' or l.cur_char == '\n' or l.cur_char == '\r' or l.cur_char == 170) {
+        while (l.cur_char == ' ' or
+            l.cur_char == '\t' or
+            l.cur_char == '\r' or
+            l.cur_char == 170)
+        {
             l.readChar();
         }
     }

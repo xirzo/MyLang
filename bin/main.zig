@@ -1,7 +1,5 @@
 const std = @import("std");
-const Lexer = @import("lexer.zig").Lexer;
-const Lexeme = @import("lexer.zig").Lexeme;
-const Parser = @import("parser.zig").Parser;
+const mylang = @import("mylang");
 
 pub fn main() !void {
     var stdout = std.fs.File.stdout();
@@ -31,9 +29,7 @@ pub fn main() !void {
         error.EndOfStream => {},
     };
 
-    const lexer: Lexer = Lexer.init(&input_buffer);
-    var parser: Parser = Parser.init(lexer, allocator);
-    var program = try parser.parse();
+    const program = try mylang.createInterpreter(allocator, &input_buffer);
     defer program.deinit();
 
     try program.execute();
