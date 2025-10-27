@@ -1,52 +1,62 @@
-// const std = @import("std");
-// const Lexer = @import("lexer.zig").Lexer;
-// const Lexeme = @import("lexer.zig").Lexeme;
-// const Parser = @import("parser.zig").Parser;
+const std = @import("std");
+const mylang = @import("mylang");
+
+test "evaluate arithmetic program" {
+    const src = "let x = 5 + 5;";
+
+    var program = try mylang.createInterpreter(std.testing.allocator, src);
+    defer std.testing.allocator.destroy(program);
+    defer program.deinit();
+
+    try program.execute();
+    try std.testing.expectEqual(10.0, program.environment.get("x").?.number);
+}
+
+test "evaluate complex arithmetic program" {
+    const src = "let x = 5 + 5 * 2;";
+
+    var program = try mylang.createInterpreter(std.testing.allocator, src);
+    defer std.testing.allocator.destroy(program);
+    defer program.deinit();
+
+    try program.execute();
+    try std.testing.expectEqual(15.0, program.environment.get("x").?.number);
+}
+
+test "evaluate parentheses program" {
+    const src = "let x = (5 + 5) * 2;";
+
+    var program = try mylang.createInterpreter(std.testing.allocator, src);
+    defer std.testing.allocator.destroy(program);
+    defer program.deinit();
+
+    try program.execute();
+    try std.testing.expectEqual(20.0, program.environment.get("x").?.number);
+}
+
+test "evaluate substraction" {
+    const src = "let x = 0 - 5;";
+
+    var program = try mylang.createInterpreter(std.testing.allocator, src);
+    defer std.testing.allocator.destroy(program);
+    defer program.deinit();
+
+    try program.execute();
+    try std.testing.expectEqual(-5.0, program.environment.get("x").?.number);
+}
+
+// test "global and local scope environments do not collide" {
+//     const src =
+//         \\ {
+//         \\   let x = 5;
+//         \\ }
+//     ;
 //
-// test "evaluate arithmetic program" {
-//     const src = "5 + 5";
-//     const lexer: Lexer = Lexer.init(src);
-//     var parser: Parser = Parser.init(lexer, std.testing.allocator);
-//
-//     var program = try parser.parse();
+//     var program = try mylang.createInterpreter(std.testing.allocator, src);
+//     defer std.testing.allocator.destroy(program);
 //     defer program.deinit();
 //
 //     try program.execute();
-//     try std.testing.expectEqual(@as(f64, 10), result);
-// }
 //
-// test "evaluate complex arithmetic program" {
-//     const src = "5 + 5 * 2";
-//     const lexer: Lexer = Lexer.init(src);
-//     var parser: Parser = Parser.init(lexer, std.testing.allocator);
-//
-//     var program = try parser.parse();
-//     defer program.deinit();
-//
-//     try program.execute();
-//     try std.testing.expectEqual(@as(f64, 15), result);
-// }
-//
-// test "evaluate parentheses program" {
-//     const src = "(5 + 5) * 2";
-//     const lexer: Lexer = Lexer.init(src);
-//     var parser: Parser = Parser.init(lexer, std.testing.allocator);
-//
-//     var program = try parser.parseExpression();
-//     defer program.deinit();
-//
-//     try program.execute();
-//     try std.testing.expectEqual(@as(f64, 20), result);
-// }
-//
-// test "evaluate substraction" {
-//     const src = "0 - 5";
-//     const lexer: Lexer = Lexer.init(src);
-//     var parser: Parser = Parser.init(lexer, std.testing.allocator);
-//
-//     var program = try parser.parseExpression();
-//     defer program.deinit();
-//
-//     try program.execute();
-//     try std.testing.expectEqual(@as(f64, -5), result);
+//     try std.testing.expect(!program.environment.contains("x"));
 // }

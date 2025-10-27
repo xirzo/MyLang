@@ -78,7 +78,7 @@ pub const Parser = struct {
         return program;
     }
 
-    pub fn parseExpression(p: *Parser) !*e.Expression {
+    fn parseExpression(p: *Parser) !*e.Expression {
         return try p.expression(0);
     }
 
@@ -287,7 +287,7 @@ pub const Parser = struct {
         return lhs;
     }
 
-    pub fn parseStatement(p: *Parser) ParseError!?*stmt.Statement {
+    fn parseStatement(p: *Parser) ParseError!?*stmt.Statement {
         const tok = p.lexer.peek();
 
         std.log.debug("got lexeme: {s}\n", .{@tagName(tok)});

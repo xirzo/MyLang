@@ -7,6 +7,7 @@ const mylang = @import("mylang");
 //     var parser = mylang.Parser.init(lexer, std.testing.allocator);
 //
 //     var program = try parser.parse();
+//     defer std.testing.allocator.destroy(program);
 //     defer program.deinit();
 //
 //     try program.execute();
@@ -16,7 +17,7 @@ const mylang = @import("mylang");
 //         return error.TestExpectedEqual;
 //     };
 //
-//     try std.testing.expect(value == 5.0);
+//     try std.testing.expect(value.number == 5.0);
 // }
 //
 // test "assign vartiable value to a variable" {
@@ -28,6 +29,7 @@ const mylang = @import("mylang");
 //     var parser = mylang.Parser.init(lexer, std.testing.allocator);
 //
 //     var program = try parser.parse();
+//     defer std.testing.allocator.destroy(program);
 //     defer program.deinit();
 //
 //     try program.execute();
@@ -37,9 +39,9 @@ const mylang = @import("mylang");
 //         return error.TestExpectedEqual;
 //     };
 //
-//     try std.testing.expect(value == 6.0);
+//     try std.testing.expect(value.number == 6.0);
 // }
-
+//
 // test "assign block to a variable" {
 //     const src =
 //         \\let x = {
@@ -50,6 +52,7 @@ const mylang = @import("mylang");
 //     var parser = mylang.Parser.init(lexer, std.testing.allocator);
 //
 //     var program = try parser.parse();
+//     defer std.testing.allocator.destroy(program);
 //     defer program.deinit();
 //
 //     try program.execute();
@@ -59,5 +62,5 @@ const mylang = @import("mylang");
 //         return error.TestExpectedEqual;
 //     };
 //
-//     try std.testing.expect(value == 6.0);
+//     try std.testing.expect(value.number == 6.0);
 // }
