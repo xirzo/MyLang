@@ -1,164 +1,244 @@
 const std = @import("std");
+const testing = std.testing;
 const mylang = @import("mylang");
 
-test "lex assignment" {
-    const src = "int a = 123;";
-    var lexer = mylang.Lexer.init(src);
+test "lexer basic tokens" {
+    var lexer = mylang.Lexer.init("+ - * / = == != > >= < <= ( ) { } ; ,");
 
-    var expected = std.array_list.Managed(mylang.Lexeme).init(std.testing.allocator);
-    defer expected.deinit();
-
-    try expected.append(mylang.Lexeme{ .ident = "int" });
-    try expected.append(mylang.Lexeme{ .ident = "a" });
-    try expected.append(mylang.Lexeme{ .assign = '=' });
-    try expected.append(mylang.Lexeme{ .number = 123 });
-    try expected.append(mylang.Lexeme{ .semicolon = ';' });
-    try expected.append(mylang.Lexeme{ .eof = {} });
-
-    for (expected.items) |exp_token| {
-        const actual_token = lexer.next();
-
-        try std.testing.expectEqual(@as(std.meta.Tag(mylang.Lexeme), exp_token), @as(std.meta.Tag(mylang.Lexeme), actual_token));
-        try expect_lexeme_equal(exp_token, actual_token);
-    }
+    try testing.expect(lexer.next() == .plus);
+    try testing.expect(lexer.next() == .minus);
+    try testing.expect(lexer.next() == .asterisk);
+    try testing.expect(lexer.next() == .slash);
+    try testing.expect(lexer.next() == .assign);
+    try testing.expect(lexer.next() == .eq);
+    try testing.expect(lexer.next() == .noteq);
+    try testing.expect(lexer.next() == .greater);
+    try testing.expect(lexer.next() == .greatereq);
+    try testing.expect(lexer.next() == .less);
+    try testing.expect(lexer.next() == .lesseq);
+    try testing.expect(lexer.next() == .lparen);
+    try testing.expect(lexer.next() == .rparen);
+    try testing.expect(lexer.next() == .lbrace);
+    try testing.expect(lexer.next() == .rbrace);
+    try testing.expect(lexer.next() == .semicolon);
+    try testing.expect(lexer.next() == .comma);
+    try testing.expect(lexer.next() == .eof);
 }
 
-test "lex addition" {
-    const src = "5 + 5";
-    var lexer = mylang.Lexer.init(src);
+test "lexer keywords" {
+    var lexer = mylang.Lexer.init("let fn ret true false if");
 
-    var expected = std.array_list.Managed(mylang.Lexeme).init(std.testing.allocator);
-    defer expected.deinit();
-
-    try expected.append(mylang.Lexeme{ .number = 5 });
-    try expected.append(mylang.Lexeme{ .plus = '+' });
-    try expected.append(mylang.Lexeme{ .number = 5 });
-    try expected.append(mylang.Lexeme{ .eof = {} });
-
-    for (expected.items) |exp_token| {
-        const actual_token = lexer.next();
-
-        try std.testing.expectEqual(@as(std.meta.Tag(mylang.Lexeme), exp_token), @as(std.meta.Tag(mylang.Lexeme), actual_token));
-        try expect_lexeme_equal(exp_token, actual_token);
-    }
+    try testing.expect(lexer.next() == .let);
+    try testing.expect(lexer.next() == .function);
+    try testing.expect(lexer.next() == .ret);
+    try testing.expect(lexer.next() == .true_literal);
+    try testing.expect(lexer.next() == .false_literal);
+    try testing.expect(lexer.next() == .if_cond);
+    try testing.expect(lexer.next() == .eof);
 }
 
-test "lex multidigit number" {
-    const src = "55";
-    var lexer = mylang.Lexer.init(src);
+test "lexer identifiers and numbers" {
+    var lexer = mylang.Lexer.init("variable 42 55.5");
 
-    var expected = std.array_list.Managed(mylang.Lexeme).init(std.testing.allocator);
-    defer expected.deinit();
+    const ident = lexer.next();
+    try testing.expect(ident == .ident);
+    try testing.expectEqualStrings("variable", ident.ident);
 
-    try expected.append(mylang.Lexeme{ .number = 55 });
-    try expected.append(mylang.Lexeme{ .eof = {} });
+    const num1 = lexer.next();
+    try testing.expect(num1 == .number);
+    try testing.expectEqual(@as(f64, 42), num1.number);
 
-    for (expected.items) |exp_token| {
-        const actual_token = lexer.next();
+    const num2 = lexer.next();
+    try testing.expect(num2 == .number);
+    try testing.expectEqual(@as(f64, 55.5), num2.number);
 
-        try std.testing.expectEqual(@as(std.meta.Tag(mylang.Lexeme), exp_token), @as(std.meta.Tag(mylang.Lexeme), actual_token));
-        try expect_lexeme_equal(exp_token, actual_token);
-    }
+    try testing.expect(lexer.next() == .eof);
 }
 
-test "lex addition no spaces" {
-    const src = "5+55";
-    var lexer = mylang.Lexer.init(src);
+test "lexer string literals" {
+    var lexer = mylang.Lexer.init("\"hello world\"");
 
-    var expected = std.array_list.Managed(mylang.Lexeme).init(std.testing.allocator);
-    defer expected.deinit();
+    const str = lexer.next();
+    try testing.expect(str == .string);
+    try testing.expectEqualStrings("hello world", str.string);
 
-    try expected.append(mylang.Lexeme{ .number = 5 });
-    try expected.append(mylang.Lexeme{ .plus = '+' });
-    try expected.append(mylang.Lexeme{ .number = 55 });
-    try expected.append(mylang.Lexeme{ .eof = {} });
-
-    for (expected.items) |exp_token| {
-        const actual_token = lexer.next();
-
-        try std.testing.expectEqual(@as(std.meta.Tag(mylang.Lexeme), exp_token), @as(std.meta.Tag(mylang.Lexeme), actual_token));
-        try expect_lexeme_equal(exp_token, actual_token);
-    }
+    try testing.expect(lexer.next() == .eof);
 }
 
-test "lex paren" {
-    const src = "2 * (5 + 5)";
-    var lexer = mylang.Lexer.init(src);
+test "lexer addition expression" {
+    var lexer = mylang.Lexer.init("5 + 5");
 
-    var expected = std.array_list.Managed(mylang.Lexeme).init(std.testing.allocator);
-    defer expected.deinit();
+    const num1 = lexer.next();
+    try testing.expect(num1 == .number);
+    try testing.expectEqual(@as(f64, 5), num1.number);
 
-    try expected.append(mylang.Lexeme{ .number = 2 });
-    try expected.append(mylang.Lexeme{ .asterisk = '*' });
-    try expected.append(mylang.Lexeme{ .lparen = '(' });
-    try expected.append(mylang.Lexeme{ .number = 5 });
-    try expected.append(mylang.Lexeme{ .plus = '+' });
-    try expected.append(mylang.Lexeme{ .number = 5 });
-    try expected.append(mylang.Lexeme{ .rparen = ')' });
-    try expected.append(mylang.Lexeme{ .eof = {} });
+    try testing.expect(lexer.next() == .plus);
 
-    for (expected.items) |exp_token| {
-        const actual_token = lexer.next();
+    const num2 = lexer.next();
+    try testing.expect(num2 == .number);
+    try testing.expectEqual(@as(f64, 5), num2.number);
 
-        try std.testing.expectEqual(@as(std.meta.Tag(mylang.Lexeme), exp_token), @as(std.meta.Tag(mylang.Lexeme), actual_token));
-        try expect_lexeme_equal(exp_token, actual_token);
-    }
+    try testing.expect(lexer.next() == .eof);
 }
 
-test "lex factorial" {
-    const src = "5!";
-    var lexer = mylang.Lexer.init(src);
+test "lexer multidigit number" {
+    var lexer = mylang.Lexer.init("55");
 
-    var expected = std.array_list.Managed(mylang.Lexeme).init(std.testing.allocator);
-    defer expected.deinit();
+    const num = lexer.next();
+    try testing.expect(num == .number);
+    try testing.expectEqual(@as(f64, 55), num.number);
 
-    try expected.append(mylang.Lexeme{ .number = 5 });
-    try expected.append(mylang.Lexeme{ .bang = '!' });
-    try expected.append(mylang.Lexeme{ .eof = {} });
-
-    for (expected.items) |exp_token| {
-        const actual_token = lexer.next();
-
-        try std.testing.expectEqual(@as(std.meta.Tag(mylang.Lexeme), exp_token), @as(std.meta.Tag(mylang.Lexeme), actual_token));
-        try expect_lexeme_equal(exp_token, actual_token);
-    }
+    try testing.expect(lexer.next() == .eof);
 }
 
-fn expect_lexeme_equal(expected: mylang.Lexeme, actual: mylang.Lexeme) !void {
-    const tag_expected = @as(std.meta.Tag(mylang.Lexeme), expected);
-    const tag_actual = @as(std.meta.Tag(mylang.Lexeme), actual);
-    try std.testing.expectEqual(tag_expected, tag_actual);
+test "lexer addition no spaces" {
+    var lexer = mylang.Lexer.init("5+55");
 
-    switch (tag_expected) {
-        .ident => try std.testing.expectEqualStrings(expected.ident, actual.ident),
-        .assign => try std.testing.expectEqual(expected.assign, actual.assign),
-        .number => try std.testing.expectEqual(expected.number, actual.number),
-        .semicolon => try std.testing.expectEqual(expected.semicolon, actual.semicolon),
-        .plus => try std.testing.expectEqual(expected.plus, actual.plus),
-        .asterisk => try std.testing.expectEqual(expected.asterisk, actual.asterisk),
-        .minus => try std.testing.expectEqual(expected.minus, actual.minus),
-        .slash => try std.testing.expectEqual(expected.slash, actual.slash),
-        .eof => try std.testing.expectEqual(expected.eof, actual.eof),
-        .lparen => try std.testing.expectEqual(expected.lparen, actual.lparen),
-        .rparen => try std.testing.expectEqual(expected.rparen, actual.rparen),
-        .bang => try std.testing.expectEqual(expected.bang, actual.bang),
-        .string => try std.testing.expectEqual(expected.string, actual.string),
-        .lbrace => try std.testing.expectEqual(expected.lbrace, actual.lbrace),
-        .rbrace => try std.testing.expectEqual(expected.rbrace, actual.rbrace),
-        .comma => try std.testing.expectEqual(expected.comma, actual.comma),
-        .let => try std.testing.expectEqual(expected.let, actual.let),
-        .function => try std.testing.expectEqual(expected.function, actual.function),
-        .ret => try std.testing.expectEqual(expected.ret, actual.ret),
-        .eq => try std.testing.expectEqual(expected.eq, actual.eq),
-        .noteq => try std.testing.expectEqual(expected.noteq, actual.noteq),
-        .greater => try std.testing.expectEqual(expected.greater, actual.greater),
-        .greatereq => try std.testing.expectEqual(expected.greatereq, actual.greatereq),
-        .less => try std.testing.expectEqual(expected.less, actual.less),
-        .lesseq => try std.testing.expectEqual(expected.lesseq, actual.lesseq),
-        .true_literal => try std.testing.expectEqual(expected.true_literal, actual.true_literal),
-        .false_literal => try std.testing.expectEqual(expected.false_literal, actual.false_literal),
-        .if_cond => try std.testing.expectEqual(expected.if_cond, actual.if_cond),
-        .eol => try std.testing.expectEqual(expected.eol, actual.eol),
-        .illegal => {},
-    }
+    const num1 = lexer.next();
+    try testing.expect(num1 == .number);
+    try testing.expectEqual(@as(f64, 5), num1.number);
+
+    try testing.expect(lexer.next() == .plus);
+
+    const num2 = lexer.next();
+    try testing.expect(num2 == .number);
+    try testing.expectEqual(@as(f64, 55), num2.number);
+
+    try testing.expect(lexer.next() == .eof);
+}
+
+test "lexer parentheses expression" {
+    var lexer = mylang.Lexer.init("2 * (5 + 5)");
+
+    const num1 = lexer.next();
+    try testing.expect(num1 == .number);
+    try testing.expectEqual(@as(f64, 2), num1.number);
+
+    try testing.expect(lexer.next() == .asterisk);
+    try testing.expect(lexer.next() == .lparen);
+
+    const num2 = lexer.next();
+    try testing.expect(num2 == .number);
+    try testing.expectEqual(@as(f64, 5), num2.number);
+
+    try testing.expect(lexer.next() == .plus);
+
+    const num3 = lexer.next();
+    try testing.expect(num3 == .number);
+    try testing.expectEqual(@as(f64, 5), num3.number);
+
+    try testing.expect(lexer.next() == .rparen);
+    try testing.expect(lexer.next() == .eof);
+}
+
+test "lexer factorial" {
+    var lexer = mylang.Lexer.init("5!");
+
+    const num = lexer.next();
+    try testing.expect(num == .number);
+    try testing.expectEqual(@as(f64, 5), num.number);
+
+    try testing.expect(lexer.next() == .bang);
+    try testing.expect(lexer.next() == .eof);
+}
+
+test "lexer whitespace handling" {
+    var lexer = mylang.Lexer.init("  \t\r let   \n  ");
+
+    try testing.expect(lexer.next() == .let);
+    try testing.expect(lexer.next() == .eol);
+    try testing.expect(lexer.next() == .eof);
+}
+
+test "lexer empty input" {
+    var lexer = mylang.Lexer.init("");
+
+    try testing.expect(lexer.next() == .eof);
+}
+
+test "lexer illegal characters" {
+    var lexer = mylang.Lexer.init("@#$");
+
+    try testing.expect(lexer.next() == .illegal);
+    try testing.expect(lexer.next() == .illegal);
+    try testing.expect(lexer.next() == .illegal);
+    try testing.expect(lexer.next() == .eof);
+}
+
+test "lexer operator precedence tokens" {
+    var lexer = mylang.Lexer.init("! != == = < <= > >=");
+
+    try testing.expect(lexer.next() == .bang);
+    try testing.expect(lexer.next() == .noteq);
+    try testing.expect(lexer.next() == .eq);
+    try testing.expect(lexer.next() == .assign);
+    try testing.expect(lexer.next() == .less);
+    try testing.expect(lexer.next() == .lesseq);
+    try testing.expect(lexer.next() == .greater);
+    try testing.expect(lexer.next() == .greatereq);
+    try testing.expect(lexer.next() == .eof);
+}
+
+test "lexer complex expression" {
+    var lexer = mylang.Lexer.init("let result = func(x, y) + 42;");
+
+    try testing.expect(lexer.next() == .let);
+
+    const ident1 = lexer.next();
+    try testing.expect(ident1 == .ident);
+    try testing.expectEqualStrings("result", ident1.ident);
+
+    try testing.expect(lexer.next() == .assign);
+
+    const ident2 = lexer.next();
+    try testing.expect(ident2 == .ident);
+    try testing.expectEqualStrings("func", ident2.ident);
+
+    try testing.expect(lexer.next() == .lparen);
+
+    const ident3 = lexer.next();
+    try testing.expect(ident3 == .ident);
+    try testing.expectEqualStrings("x", ident3.ident);
+
+    try testing.expect(lexer.next() == .comma);
+
+    const ident4 = lexer.next();
+    try testing.expect(ident4 == .ident);
+    try testing.expectEqualStrings("y", ident4.ident);
+
+    try testing.expect(lexer.next() == .rparen);
+    try testing.expect(lexer.next() == .plus);
+
+    const num = lexer.next();
+    try testing.expect(num == .number);
+    try testing.expectEqual(@as(f64, 42), num.number);
+
+    try testing.expect(lexer.next() == .semicolon);
+    try testing.expect(lexer.next() == .eof);
+}
+
+test "lexer string with spaces" {
+    var lexer = mylang.Lexer.init("\"hello world with spaces\"");
+
+    const str = lexer.next();
+    try testing.expect(str == .string);
+    try testing.expectEqualStrings("hello world with spaces", str.string);
+
+    try testing.expect(lexer.next() == .eof);
+}
+
+test "lexer multiple strings" {
+    var lexer = mylang.Lexer.init("\"first\" + \"second\"");
+
+    const str1 = lexer.next();
+    try testing.expect(str1 == .string);
+    try testing.expectEqualStrings("first", str1.string);
+
+    try testing.expect(lexer.next() == .plus);
+
+    const str2 = lexer.next();
+    try testing.expect(str2 == .string);
+    try testing.expectEqualStrings("second", str2.string);
+
+    try testing.expect(lexer.next() == .eof);
 }
