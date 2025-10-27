@@ -45,16 +45,18 @@ test "evaluate substraction" {
     try std.testing.expectEqual(-5.0, program.environment.get("x").?.number);
 }
 
-// test "evaluate array ith element" {
-//     const src = "let x = [1, 2, 3];";
-//
-//     var program = try mylang.createInterpreter(std.testing.allocator, src);
-//     defer std.testing.allocator.destroy(program);
-//     defer program.deinit();
-//
-//     try program.execute();
-//     try std.testing.expectEqual(1.0, program.environment.get("x").?.array.items[0].number);
-// }
+test "evaluate array ith element" {
+    const src = "let x = [1, 2, 3];";
+
+    var program = try mylang.createInterpreter(std.testing.allocator, src);
+    defer {
+        program.deinit();
+        std.testing.allocator.destroy(program);
+    }
+
+    try program.execute();
+    try std.testing.expectEqual(1.0, program.environment.get("x").?.array.items[0].number);
+}
 
 // test "evaluate an array" {
 //     const src = "let x = [1, 2, 3];";

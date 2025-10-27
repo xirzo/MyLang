@@ -42,7 +42,7 @@ pub const Evaluator = struct {
     }
 
     fn evaluateArray(self: *Evaluator, arr: std.array_list.Managed(*e.Expression)) EvaluationError!v.Value {
-        var elements = std.array_list.Managed(v.Value).init(self.environment.allocator);
+        var elements = std.array_list.Managed(v.Value).init(self.program.allocator);
 
         for (arr.items) |el| {
             try elements.append(try self.evaluate(el));

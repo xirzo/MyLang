@@ -51,9 +51,13 @@ pub const Program = struct {
             std.log.debug("Deinited statement\n", .{});
         }
 
-        // NOTE: may cause double free, because statements are already destroyed?
-        var builtins_iter = self.builtins.iterator();
+        var env_iter = self.environment.iterator();
+        while (env_iter.next()) |entry| {
+            var value = entry.value_ptr;
+            value.deinit(self.allocator);
+        }
 
+        var builtins_iter = self.builtins.iterator();
         while (builtins_iter.next()) |entry| {
             self.allocator.free(entry.value_ptr.*.name);
             self.allocator.destroy(entry.value_ptr.*);
@@ -63,6 +67,8 @@ pub const Program = struct {
         self.environment.deinit();
         self.functions.deinit();
         self.builtins.deinit();
+
+        self.ret_value.deinit(self.allocator);
         self.allocator.destroy(self.ret_value);
     }
 
