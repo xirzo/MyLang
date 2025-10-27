@@ -41,6 +41,7 @@ pub const Lexeme = union(enum) {
             .minus => |char| char,
             .slash => |char| char,
             .bang => |char| char,
+            .sq_lbracket => |char| char,
             else => null,
         };
     }

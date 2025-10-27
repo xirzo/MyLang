@@ -70,6 +70,7 @@ pub const Evaluator = struct {
             '*' => try multiplyValues(self.program.allocator, lhs, rhs),
             '/' => try divideValues(lhs, rhs),
             '!' => try factorialValue(lhs),
+            '[' => try indexArray(lhs, rhs),
             else => error.UnsupportedOperator,
         };
     }
@@ -459,4 +460,28 @@ fn compareValues(lhs: v.Value, rhs: v.Value, op: []const u8) EvaluationError!v.V
     };
 
     return v.Value{ .boolean = result };
+}
+
+fn indexArray(array_val: v.Value, index_val: v.Value) EvaluationError!v.Value {
+    const array = switch (array_val) {
+        .array => |arr| arr,
+        else => return error.TypeMismatch,
+    };
+
+    const index = switch (index_val) {
+        .number => |num| blk: {
+            if (num < 0 or num != @trunc(num)) {
+                return error.InvalidIndex;
+            }
+
+            break :blk @as(usize, @intFromFloat(num));
+        },
+        else => return error.TypeMismatch,
+    };
+
+    if (index >= array.items.len) {
+        return error.IndexOutOfBounds;
+    }
+
+    return array.items[index];
 }

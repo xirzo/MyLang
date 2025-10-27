@@ -107,7 +107,8 @@ pub const Parser = struct {
 
     fn postfixBindingPower(op: u8) ?u8 {
         return switch (op) {
-            '!' => 7,
+            '!' => 8,
+            '[' => 9,
             else => null,
         };
     }
@@ -151,7 +152,7 @@ pub const Parser = struct {
 
                 if (p.lexer.peek() != .rparen) {
                     while (true) {
-                        const param_expr = try p.parseExpression();
+                        const param_expr = try p.expression(0);
                         try parameters.append(param_expr);
 
                         const next_token = p.lexer.next();
@@ -193,7 +194,7 @@ pub const Parser = struct {
                 var elements = std.array_list.Managed(*e.Expression).init(p.allocator);
 
                 while (p.lexer.peek() != .sq_rbracket) {
-                    const element = try p.parseExpression();
+                    const element = try p.expression(0);
 
                     try elements.append(element);
 
@@ -203,7 +204,6 @@ pub const Parser = struct {
                 }
 
                 assert(p.lexer.next() == .sq_rbracket);
-                _ = p.lexer.next();
 
                 const node = try p.allocator.create(e.Expression);
                 node.* = e.Expression{ .constant = .{ .array = elements } };
@@ -273,7 +273,19 @@ pub const Parser = struct {
                 _ = p.lexer.next();
 
                 const new_lhs = try p.allocator.create(e.Expression);
-                new_lhs.* = e.Expression{ .binary_operator = .{ .lhs = lhs, .rhs = null, .value = oper_char } };
+
+                new_lhs.* = switch (oper_char) {
+                    '[' => blk: {
+                        const rhs = try p.expression(0);
+
+                        assert(p.lexer.next() == .sq_rbracket);
+
+                        break :blk e.Expression{ .binary_operator = .{ .lhs = lhs, .rhs = rhs, .value = '[' } };
+                    },
+
+                    else => e.Expression{ .binary_operator = .{ .lhs = lhs, .rhs = null, .value = oper_char } },
+                };
+
                 lhs = new_lhs;
                 continue;
             }

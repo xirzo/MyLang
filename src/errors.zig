@@ -12,6 +12,8 @@ pub const EvaluationError = error{
     NoLeftExpression,
     NoRightExpression,
     WriteFailed,
+    InvalidIndex,
+    IndexOutOfBounds,
 };
 
 pub const ExecutionError = EvaluationError;
