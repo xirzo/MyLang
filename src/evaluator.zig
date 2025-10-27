@@ -57,7 +57,6 @@ pub const Evaluator = struct {
     fn evaluateFunctionCall(self: *Evaluator, function_call: *e.FunctionCall) EvaluationError!v.Value {
         if (self.program.builtins.get(function_call.function_name)) |builtin_ptr| {
             const builtin = builtin_ptr.*;
-
             var args = std.array_list.Managed(v.Value).init(self.program.allocator);
             defer args.deinit();
 
@@ -66,13 +65,8 @@ pub const Evaluator = struct {
                 try args.append(param_value);
             }
 
+            self.program.should_return = false;
             return builtin.executor(self.program, args.items);
-        }
-
-        var iter = self.functions.iterator();
-
-        while (iter.next()) |entry| {
-            std.log.debug("Available function: {s}\n", .{entry.key_ptr.*});
         }
 
         const func = self.functions.get(function_call.function_name) orelse {
@@ -80,39 +74,28 @@ pub const Evaluator = struct {
             return error.UndefinedFunction;
         };
 
-        std.log.debug("Found function: {s}\n", .{func.name});
-
-        var saved_vars = std.StringHashMap(v.Value).init(self.environment.allocator);
-        defer saved_vars.deinit();
-
-        var env_iter = self.environment.iterator();
-
-        while (env_iter.next()) |entry| {
-            try saved_vars.put(entry.key_ptr.*, entry.value_ptr.*);
+        if (func.parameters.items.len != function_call.parameters.items.len) {
+            std.log.err("Function {s} expects {d} parameters, got {d}", .{ function_call.function_name, func.parameters.items.len, function_call.parameters.items.len });
+            return error.UndefinedFunction;
         }
 
-        if (function_call.parameters.items.len > 0 or func.parameters.items.len > 0) {
-            if (func.parameters.items.len != function_call.parameters.items.len) {
-                std.log.err("Function {s} expects {d} parameters, got {d}", .{ function_call.function_name, func.parameters.items.len, function_call.parameters.items.len });
-                return error.UndefinedFunction;
-            }
+        var function_env = std.StringHashMap(v.Value).init(self.environment.allocator);
+        defer function_env.deinit();
 
-            for (function_call.parameters.items, 0..) |param_expr, i| {
-                const param_value = try self.evaluate(param_expr);
-                try self.environment.put(func.parameters.items[i], param_value);
-            }
+        for (function_call.parameters.items, 0..) |param_expr, i| {
+            const param_value = try self.evaluate(param_expr);
+            try function_env.put(func.parameters.items[i], param_value);
         }
 
-        var block_statement = s.Statement{ .block = func.block.* };
+        const saved_env = self.environment;
+        self.environment = &function_env;
+        defer self.environment = saved_env;
 
-        try ex.executeStatement(&block_statement, self.program);
+        const saved_ret_value = self.program.ret_value.*;
+        self.program.ret_value.* = v.Value{ .none = {} };
+        defer self.program.ret_value.* = saved_ret_value;
 
-        self.environment.clearRetainingCapacity();
-        var saved_iter = saved_vars.iterator();
-
-        while (saved_iter.next()) |entry| {
-            try self.environment.put(entry.key_ptr.*, entry.value_ptr.*);
-        }
+        try ex.executeBlock(func.block, self.program);
 
         return self.program.ret_value.*;
     }
@@ -343,6 +326,8 @@ fn compareValues(lhs: v.Value, rhs: v.Value, op: []const u8) EvaluationError!v.V
                 .number => |n| n,
                 else => return error.TypeMismatch,
             };
+
+            // std.debug.print("{d} {s} {d}, {}\n", .{ lnum, op, rnum, lnum <= rnum });
 
             break :blk if (std.mem.eql(u8, op, "=="))
                 lnum == rnum

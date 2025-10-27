@@ -38,16 +38,20 @@ pub fn executeStatement(statement: *stmt.Statement, program: *prog.Program) Exec
     }
 }
 
-fn executeBlock(block: *stmt.Block, program: *prog.Program) ExecutionError!void {
+pub fn executeBlock(block: *stmt.Block, program: *prog.Program) ExecutionError!void {
     for (block.statements.items) |block_statement| {
         try executeStatement(block_statement, program);
+
+        if (program.should_return) {
+            return;
+        }
     }
 }
 
 fn executeReturn(ret: *stmt.Return, program: *prog.Program) ExecutionError!void {
     if (ret.value) |val| {
         program.ret_value.* = try program.evaluator.evaluate(val);
-        return;
+        program.should_return = true;
     }
 }
 

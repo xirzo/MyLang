@@ -16,6 +16,7 @@ pub const Program = struct {
     builtins: std.StringHashMap(*stmt.BuiltinFunction),
     evaluator: ev.Evaluator,
     ret_value: *v.Value,
+    should_return: bool,
 
     pub fn init(allocator: std.mem.Allocator) !Program {
         const ret_value = try allocator.create(v.Value);
@@ -29,6 +30,7 @@ pub const Program = struct {
             .allocator = allocator,
             .evaluator = undefined,
             .ret_value = ret_value,
+            .should_return = false,
         };
 
         try program.registerBuiltins();
