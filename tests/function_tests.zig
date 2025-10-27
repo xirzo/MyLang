@@ -53,33 +53,54 @@ test "call a function with value" {
     try std.testing.expectEqual(value.number, 5.0);
 }
 
-// FIX: stack overflow n is negative for some reason
-// test "count fibonacci sequence" {
-//     const src =
-//         \\ fn fib(n) {
-//         \\     if n < 1 {
-//         \\         ret 1;
-//         \\     }
-//         \\
-//         \\     ret fib(n-1) + fib(n-2);
-//         \\ }
-//         \\
-//         \\ let x = fib(2);
-//     ;
-//
-//     const lexer: Lexer = Lexer.init(src);
-//     var parser: Parser = Parser.init(lexer, std.testing.allocator);
-//
-//     var program = try parser.parse();
-//     defer std.testing.allocator.destroy(program);
-//     defer program.deinit();
-//
-//     try program.execute();
-//
-//     const value = program.environment.get("x") orelse {
-//         std.log.debug("Variable 'x' not found in environment\n", .{});
-//         return error.TestExpectedEqual;
-//     };
-//
-//     try std.testing.expectEqual(value.number, 5.0);
-// }
+test "double ret function" {
+    const src =
+        \\ fn test(x) {
+        \\ if x < 0 {
+        \\   ret 0;
+        \\ }
+        \\   ret 1;
+        \\ }
+        \\ let x = test(2);
+    ;
+
+    var program = try mylang.createInterpreter(std.testing.allocator, src);
+    defer std.testing.allocator.destroy(program);
+    defer program.deinit();
+
+    try program.execute();
+
+    const value = program.environment.get("x") orelse {
+        std.log.debug("Variable 'x' not found in environment\n", .{});
+        return error.TestExpectedEqual;
+    };
+
+    try std.testing.expectEqual(value.number, 1.0);
+}
+
+test "count fibonacci sequence" {
+    const src =
+        \\ fn fib(n) {
+        \\     if n <= 1 {
+        \\         ret n;
+        \\     }
+        \\
+        \\     ret fib(n-1) + fib(n-2);
+        \\ }
+        \\
+        \\ let x = fib(5);
+    ;
+
+    var program = try mylang.createInterpreter(std.testing.allocator, src);
+    defer std.testing.allocator.destroy(program);
+    defer program.deinit();
+
+    try program.execute();
+
+    const value = program.environment.get("x") orelse {
+        std.log.debug("Variable 'x' not found in environment\n", .{});
+        return error.TestExpectedEqual;
+    };
+
+    try std.testing.expectEqual(value.number, 5.0);
+}

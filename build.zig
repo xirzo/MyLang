@@ -59,12 +59,11 @@ pub fn build(b: *std.Build) void {
     const run_exe_unit_tests = b.addRunArtifact(exe_unit_tests);
 
     const test_files = [_][]const u8{
-        // "tests/environment_tests.zig",
         "tests/evaluator_tests.zig",
         "tests/function_tests.zig",
         "tests/lexer_tests.zig",
         "tests/parser_tests.zig",
-        // "tests/integration_tests.zig",
+        "tests/integration_tests.zig",
     };
 
     const test_step = b.step("test", "Run unit tests");
