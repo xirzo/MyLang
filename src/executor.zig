@@ -66,24 +66,37 @@ fn executeIf(if_stmt: *stmt.If, program: *prog.Program) ExecutionError!void {
     try executeBlock(if_stmt.body, program);
 }
 
+fn printValue(writer: *std.fs.File.Writer, value: v.Value) !void {
+    switch (value) {
+        .number => |n| try writer.interface.print("{d}", .{n}),
+        .string => |str| try writer.interface.print("{s}", .{str}),
+        .char => |c| try writer.interface.print("{c}", .{c}),
+        .boolean => |b| try writer.interface.print("{}", .{b}),
+        .array => |arr| {
+            try writer.interface.print("[", .{});
+            for (arr.items, 0..) |item, i| {
+                if (i > 0) {
+                    try writer.interface.print(", ", .{});
+                }
+
+                try printValue(writer, item);
+            }
+            try writer.interface.print("]", .{});
+        },
+        .none => try writer.interface.print("(none)", .{}),
+    }
+}
+
 pub fn printlnExecutor(program: *prog.Program, args: []const v.Value) ExecutionError!v.Value {
     _ = program;
-
     var buf: [1024]u8 = undefined;
     var writer = std.fs.File.writer(std.fs.File.stdout(), &buf);
 
     if (args.len == 0) {
-        std.log.debug("\n", .{});
+        try writer.interface.print("\n", .{});
     } else {
-        switch (args[0]) {
-            .number => |n| try writer.interface.print("{}\n", .{n}),
-            .string => |str| try writer.interface.print("{s}\n", .{str}),
-            .char => |c| try writer.interface.print("{c}\n", .{c}),
-            .boolean => |b| try writer.interface.print("{}\n", .{b}),
-            // TODO: add proper printing
-            .array => |arr| try writer.interface.print("{}\n", .{arr}),
-            .none => try writer.interface.print("(none)\n", .{}),
-        }
+        try printValue(&writer, args[0]);
+        try writer.interface.print("\n", .{});
     }
 
     try writer.interface.flush();

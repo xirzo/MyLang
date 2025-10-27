@@ -1,2 +1,7 @@
-let arr = [1, 2, 3, 4, 5];
-println(arr[1]);
+let first_arr = [1, 2, 3, 4, 5];
+
+println(first_arr[1]);
+
+let second_arr = [6, 7, 8];
+
+println(first_arr + second_arr);
