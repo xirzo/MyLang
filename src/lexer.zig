@@ -111,7 +111,6 @@ pub const Lexer = struct {
         return ch >= '0' and ch <= '9';
     }
 
-    // TODO: maybe write a trie for this
     fn isKeyword(ident: []const u8) ?Lexeme {
         if (std.mem.eql(u8, ident, "let")) {
             return Lexeme{ .let = {} };
@@ -137,7 +136,7 @@ pub const Lexer = struct {
     fn parseIdentifier(l: *Lexer) []const u8 {
         const start_pos = l.cur_pos;
 
-        while (Lexer.isLetter(l.cur_char)) {
+        while (isLetter(l.cur_char)) {
             l.readChar();
         }
 
@@ -146,8 +145,13 @@ pub const Lexer = struct {
 
     fn parseNumber(l: *Lexer) []const u8 {
         const start_pos = l.cur_pos;
+        var has_dot = false;
 
-        while (Lexer.isDigit(l.cur_char)) {
+        while (isDigit(l.cur_char) or (l.cur_char == '.' and !has_dot)) {
+            if (l.cur_char == '.') {
+                has_dot = true;
+            }
+
             l.readChar();
         }
 
@@ -165,7 +169,6 @@ pub const Lexer = struct {
         return l.src[start_pos..l.cur_pos];
     }
 
-    // TODO: add string parseTruement
     pub fn next(l: *Lexer) Lexeme {
         l.skipWhitespaces();
 
@@ -212,7 +215,7 @@ pub const Lexer = struct {
             },
             0 => Lexeme{ .eof = {} },
             else => blk: {
-                if (Lexer.isLetter(l.cur_char)) {
+                if (isLetter(l.cur_char)) {
                     const ident = l.parseIdentifier();
 
                     if (isKeyword(ident)) |keyword| {
@@ -221,7 +224,7 @@ pub const Lexer = struct {
 
                     const lexeme = Lexeme{ .ident = ident };
                     return lexeme;
-                } else if (Lexer.isDigit(l.cur_char)) {
+                } else if (isDigit(l.cur_char)) {
                     const num_str = l.parseNumber();
                     const num = std.fmt.parseFloat(f64, num_str) catch 0;
                     const lexeme = Lexeme{ .number = num };
