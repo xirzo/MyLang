@@ -1,9 +1,9 @@
 fn fib(n) {
     if n <= 1 {
-        ret n
+        ret n;
     }
 
-    ret fib(n-1) + fib(n-2)
+    ret fib(n-1) + fib(n-2);
 }
 
-let x = fib(5)
+println(fib(5));

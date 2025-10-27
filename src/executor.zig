@@ -22,16 +22,8 @@ pub fn executeStatement(statement: *stmt.Statement, program: *prog.Program) Exec
             try program.registerFunction(function_declaration);
         },
         .builtin_function => |_| {
-
             // NOTE: this code actually is not needed, as it will never be executed
             //     const builtin_fn = try program.allocator.create(stmt.BuiltinFunction);
-            //
-            //     builtin_fn.* = stmt.BuiltinFunction{
-            //         .name = try program.allocator.dupe(u8, builtin_function.name),
-            //         .executor = builtin_function.executor,
-            //     };
-            //
-            // try program.builtins.put(builtin_function.name, builtin_fn);
         },
         .ret => |*ret| try executeReturn(ret, program),
         .if_cond => |*if_cond| try executeIf(if_cond, program),

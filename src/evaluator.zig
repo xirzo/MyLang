@@ -79,25 +79,44 @@ pub const Evaluator = struct {
             return error.UndefinedFunction;
         }
 
-        var function_env = std.StringHashMap(v.Value).init(self.environment.allocator);
-        defer function_env.deinit();
+        var param_values = std.array_list.Managed(v.Value).init(self.environment.allocator);
+        defer param_values.deinit();
 
-        for (function_call.parameters.items, 0..) |param_expr, i| {
+        for (function_call.parameters.items) |param_expr| {
             const param_value = try self.evaluate(param_expr);
-            try function_env.put(func.parameters.items[i], param_value);
+            try param_values.append(param_value);
         }
 
-        const saved_env = self.environment;
-        self.environment = &function_env;
-        defer self.environment = saved_env;
+        var saved_vars = std.StringHashMap(v.Value).init(self.environment.allocator);
+        defer saved_vars.deinit();
+
+        var env_iter = self.environment.iterator();
+        while (env_iter.next()) |entry| {
+            try saved_vars.put(entry.key_ptr.*, entry.value_ptr.*);
+        }
+
+        self.environment.clearRetainingCapacity();
+        for (param_values.items, 0..) |param_value, i| {
+            try self.environment.put(func.parameters.items[i], param_value);
+        }
 
         const saved_ret_value = self.program.ret_value.*;
         self.program.ret_value.* = v.Value{ .none = {} };
-        defer self.program.ret_value.* = saved_ret_value;
+        self.program.should_return = false;
 
         try ex.executeBlock(func.block, self.program);
 
-        return self.program.ret_value.*;
+        const return_value = self.program.ret_value.*;
+
+        self.environment.clearRetainingCapacity();
+        var saved_iter = saved_vars.iterator();
+        while (saved_iter.next()) |entry| {
+            try self.environment.put(entry.key_ptr.*, entry.value_ptr.*);
+        }
+
+        self.program.ret_value.* = saved_ret_value;
+
+        return return_value;
     }
 
     fn evaluateComparison(self: *Evaluator, comp: e.ComparisonOperator) EvaluationError!v.Value {
