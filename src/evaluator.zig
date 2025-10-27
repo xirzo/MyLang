@@ -23,12 +23,32 @@ pub const Evaluator = struct {
 
     pub fn evaluate(self: *Evaluator, expr: *e.Expression) EvaluationError!v.Value {
         return switch (expr.*) {
-            .constant => |a| a.value,
+            .constant => |constant| self.evaluateConstant(constant),
             .variable => |vrbl| self.evaluateVariable(vrbl),
             .binary_operator => |o| self.evaluateBinaryOperator(o),
             .function_call => |*function_call| self.evaluateFunctionCall(function_call),
             .comparison_operator => |*comp| self.evaluateComparison(comp.*),
         };
+    }
+
+    fn evaluateConstant(self: *Evaluator, constant: e.Constant) EvaluationError!v.Value {
+        return switch (constant) {
+            .number => |num| v.Value{ .number = num },
+            .string => |str| v.Value{ .string = str },
+            .char => |ch| v.Value{ .char = ch },
+            .boolean => |b| v.Value{ .boolean = b },
+            .array => |arr| self.evaluateArray(arr),
+        };
+    }
+
+    fn evaluateArray(self: *Evaluator, arr: std.array_list.Managed(*e.Expression)) EvaluationError!v.Value {
+        var elements = std.array_list.Managed(v.Value).init(self.environment.allocator);
+
+        for (arr.items) |el| {
+            try elements.append(try self.evaluate(el));
+        }
+
+        return v.Value{ .array = elements };
     }
 
     fn evaluateVariable(self: *Evaluator, vrbl: e.Variable) EvaluationError!v.Value {
@@ -158,6 +178,9 @@ fn addValues(allocator: std.mem.Allocator, lhs: v.Value, rhs: v.Value) Evaluatio
                 .boolean => |_| {
                     return error.TypeMismatch;
                 },
+                .array => |_| {
+                    return error.TypeMismatch;
+                },
                 .none => return lhs,
             }
         },
@@ -190,6 +213,9 @@ fn addValues(allocator: std.mem.Allocator, lhs: v.Value, rhs: v.Value) Evaluatio
                     @memcpy(result[lstr.len..], rstr);
                     return v.Value{ .string = result };
                 },
+                .array => |_| {
+                    return error.TypeMismatch;
+                },
                 .none => return lhs,
             }
         },
@@ -213,6 +239,9 @@ fn addValues(allocator: std.mem.Allocator, lhs: v.Value, rhs: v.Value) Evaluatio
                 .boolean => |_| {
                     return error.TypeMismatch;
                 },
+                .array => |_| {
+                    return error.TypeMismatch;
+                },
                 .none => return lhs,
             }
         },
@@ -233,6 +262,33 @@ fn addValues(allocator: std.mem.Allocator, lhs: v.Value, rhs: v.Value) Evaluatio
                 },
                 .boolean => |_| {
                     return error.TypeMismatch;
+                },
+                .array => |_| {
+                    return error.TypeMismatch;
+                },
+                .none => return lhs,
+            }
+        },
+        .array => |larr| {
+            switch (rhs) {
+                .number => |_| {
+                    return error.TypeMismatch;
+                },
+                .string => |_| {
+                    return error.TypeMismatch;
+                },
+                .char => |_| {
+                    return error.TypeMismatch;
+                },
+                .boolean => |_| {
+                    return error.TypeMismatch;
+                },
+                .array => |rarr| {
+                    // NOTE: is this how you do that?
+                    const result = try allocator.alloc(v.Value, larr.items.len + rarr.items.len);
+                    @memcpy(result[0..larr.items.len], larr.items.ptr);
+                    @memcpy(result[larr.items.len..], rarr.items.ptr);
+                    return v.Value{ .array = larr };
                 },
                 .none => return lhs,
             }

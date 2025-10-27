@@ -56,6 +56,7 @@ fn executeIf(if_stmt: *stmt.If, program: *prog.Program) ExecutionError!void {
         .char => |c| c > 0,
         .boolean => |b| b == true,
         .none => false,
+        .array => |arr| arr.items.len > 0,
     };
 
     if (!should_execute) {
@@ -79,6 +80,8 @@ pub fn printlnExecutor(program: *prog.Program, args: []const v.Value) ExecutionE
             .string => |str| try writer.interface.print("{s}\n", .{str}),
             .char => |c| try writer.interface.print("{c}\n", .{c}),
             .boolean => |b| try writer.interface.print("{}\n", .{b}),
+            // TODO: add proper printing
+            .array => |arr| try writer.interface.print("{}\n", .{arr}),
             .none => try writer.interface.print("(none)\n", .{}),
         }
     }

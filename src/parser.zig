@@ -118,22 +118,22 @@ pub const Parser = struct {
         var lhs: *e.Expression = switch (lex_item) {
             .number => |num| blk: {
                 const expr_node: *e.Expression = try p.allocator.create(e.Expression);
-                expr_node.* = e.Expression{ .constant = .{ .value = .{ .number = num } } };
+                expr_node.* = e.Expression{ .constant = .{ .number = num } };
                 break :blk expr_node;
             },
             .string => |str| blk: {
                 const expr_node: *e.Expression = try p.allocator.create(e.Expression);
-                expr_node.* = e.Expression{ .constant = .{ .value = .{ .string = str } } };
+                expr_node.* = e.Expression{ .constant = .{ .string = str } };
                 break :blk expr_node;
             },
             .true_literal => blk: {
                 const expr_node: *e.Expression = try p.allocator.create(e.Expression);
-                expr_node.* = e.Expression{ .constant = .{ .value = .{ .boolean = true } } };
+                expr_node.* = e.Expression{ .constant = .{ .boolean = true } };
                 break :blk expr_node;
             },
             .false_literal => blk: {
                 const expr_node: *e.Expression = try p.allocator.create(e.Expression);
-                expr_node.* = e.Expression{ .constant = .{ .value = .{ .boolean = false } } };
+                expr_node.* = e.Expression{ .constant = .{ .boolean = false } };
                 break :blk expr_node;
             },
             .ident => |name| blk: {
@@ -188,6 +188,27 @@ pub const Parser = struct {
                 const lhs_expr = try p.expression(0);
                 assert(p.lexer.next() == .rparen);
                 break :blk lhs_expr;
+            },
+            .sq_lbracket => blk: {
+                var elements = std.array_list.Managed(*e.Expression).init(p.allocator);
+
+                while (p.lexer.peek() != .sq_rbracket) {
+                    const element = try p.parseExpression();
+
+                    try elements.append(element);
+
+                    if (p.lexer.peek() == .comma) {
+                        _ = p.lexer.next();
+                    }
+                }
+
+                assert(p.lexer.next() == .sq_rbracket);
+                _ = p.lexer.next();
+
+                const node = try p.allocator.create(e.Expression);
+                node.* = e.Expression{ .constant = .{ .array = elements } };
+
+                break :blk node;
             },
             else => blk: {
                 if (lex_item.getOperatorChar()) |char| {
