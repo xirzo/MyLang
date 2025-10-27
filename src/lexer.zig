@@ -230,7 +230,7 @@ pub const Lexer = struct {
                     const lexeme = Lexeme{ .number = num };
                     return lexeme;
                 } else {
-                    std.log.err("illegal character: '{c}' (byte value: {d})", .{ l.cur_char, l.cur_char });
+                    // std.log.err("illegal character: '{c}' (byte value: {d})", .{ l.cur_char, l.cur_char });
                     break :blk Lexeme{ .illegal = {} };
                 }
             },

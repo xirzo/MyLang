@@ -78,7 +78,7 @@ pub const Parser = struct {
         return program;
     }
 
-    fn parseExpression(p: *Parser) !*e.Expression {
+    pub fn parseExpression(p: *Parser) !*e.Expression {
         return try p.expression(0);
     }
 
@@ -287,7 +287,7 @@ pub const Parser = struct {
         return lhs;
     }
 
-    fn parseStatement(p: *Parser) ParseError!?*stmt.Statement {
+    pub fn parseStatement(p: *Parser) ParseError!?*stmt.Statement {
         const tok = p.lexer.peek();
 
         std.log.debug("got lexeme: {s}\n", .{@tagName(tok)});
@@ -527,13 +527,8 @@ pub const Parser = struct {
         errdefer self.allocator.destroy(block_ptr);
 
         switch (block_stmt.*) {
-            .block => |*blk| {
-                block_ptr.* = stmt.Block{
-                    .statements = blk.statements,
-                    .environment = blk.environment,
-                };
-                blk.statements = std.array_list.Managed(*stmt.Statement).init(self.allocator);
-                blk.environment = std.StringHashMap(v.Value).init(self.allocator);
+            .block => |block| {
+                block_ptr.* = block;
             },
             else => {
                 self.allocator.destroy(block_ptr);
@@ -544,6 +539,8 @@ pub const Parser = struct {
 
         const if_stmt = try self.allocator.create(stmt.Statement);
         if_stmt.* = .{ .if_cond = .{ .body = block_ptr, .condition = value } };
+
+        self.allocator.destroy(block_stmt);
 
         return if_stmt;
     }

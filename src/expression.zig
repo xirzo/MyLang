@@ -59,7 +59,12 @@ pub const Expression = union(enum) {
                 }
             },
             .function_call => |*function_call| function_call.deinit(allocator),
-            .comparison_operator => {},
+            .comparison_operator => |*comp_op| {
+                comp_op.lhs.deinit(allocator);
+                allocator.destroy(comp_op.lhs);
+                comp_op.rhs.deinit(allocator);
+                allocator.destroy(comp_op.rhs);
+            },
         }
     }
 };
