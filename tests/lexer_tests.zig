@@ -3,7 +3,7 @@ const testing = std.testing;
 const mylang = @import("mylang");
 
 test "lexer basic tokens" {
-    var lexer = mylang.Lexer.init("+ - * / = == != > >= < <= ( ) { } ; ,");
+    var lexer = mylang.Lexer.init("+ - * / = == != > >= < <= ( ) { } [ ] ; ,");
 
     try testing.expect(lexer.next() == .plus);
     try testing.expect(lexer.next() == .minus);
@@ -20,6 +20,8 @@ test "lexer basic tokens" {
     try testing.expect(lexer.next() == .rparen);
     try testing.expect(lexer.next() == .lbrace);
     try testing.expect(lexer.next() == .rbrace);
+    try testing.expect(lexer.next() == .sq_lbracket);
+    try testing.expect(lexer.next() == .sq_rbracket);
     try testing.expect(lexer.next() == .semicolon);
     try testing.expect(lexer.next() == .comma);
     try testing.expect(lexer.next() == .eof);

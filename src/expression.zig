@@ -2,8 +2,25 @@ const std = @import("std");
 const s = @import("statement.zig");
 const v = @import("value.zig");
 
-pub const Constant = struct {
-    value: v.Value,
+pub const Constant = union(enum) {
+    number: f64,
+    string: []const u8,
+    char: u8,
+    boolean: bool,
+    array: std.array_list.Managed(*Expression),
+
+    pub fn deinit(self: *Constant, allocator: std.mem.Allocator) void {
+        switch (self.*) {
+            .array => |*arr| {
+                for (arr.items) |el| {
+                    el.deinit(allocator);
+                    allocator.destroy(el);
+                }
+                arr.deinit();
+            },
+            else => {},
+        }
+    }
 };
 
 pub const BinaryOperator = struct {
@@ -44,7 +61,7 @@ pub const Expression = union(enum) {
 
     pub fn deinit(self: *Expression, allocator: std.mem.Allocator) void {
         switch (self.*) {
-            .constant => {},
+            .constant => |*constant| constant.deinit(allocator),
             .variable => |*vrbl| {
                 allocator.free(vrbl.name);
             },

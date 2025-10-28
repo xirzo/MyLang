@@ -1,0 +1,6 @@
+let first_arr = [1, 2, 3, 4, 5];
+let second_arr = [6, 7, 8];
+
+let x = first_arr + second_arr;
+
+println(x);

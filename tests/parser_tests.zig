@@ -27,8 +27,8 @@ test "parse number literal" {
         allocator.destroy(expr);
     }
 
-    try testing.expect(expr.constant.value == .number);
-    try testing.expectEqual(@as(f64, 42), expr.constant.value.number);
+    try testing.expect(expr.constant == .number);
+    try testing.expectEqual(@as(f64, 42), expr.constant.number);
 }
 
 test "parse number literal with dot" {
@@ -40,8 +40,8 @@ test "parse number literal with dot" {
         allocator.destroy(expr);
     }
 
-    try testing.expect(expr.constant.value == .number);
-    try testing.expectEqual(@as(f64, 3.14), expr.constant.value.number);
+    try testing.expect(expr.constant == .number);
+    try testing.expectEqual(@as(f64, 3.14), expr.constant.number);
 }
 
 test "parse string literal" {
@@ -54,8 +54,8 @@ test "parse string literal" {
         allocator.destroy(expr);
     }
 
-    try testing.expect(expr.constant.value == .string);
-    try testing.expectEqualStrings("hello world", expr.constant.value.string);
+    try testing.expect(expr.constant == .string);
+    try testing.expectEqualStrings("hello world", expr.constant.string);
 }
 
 test "parse trueliteral" {
@@ -67,8 +67,8 @@ test "parse trueliteral" {
         allocator.destroy(expr);
     }
 
-    try testing.expect(expr.constant.value == .boolean);
-    try testing.expect(expr.constant.value.boolean == true);
+    try testing.expect(expr.constant == .boolean);
+    try testing.expect(expr.constant.boolean == true);
 }
 
 test "parse false literal" {
@@ -80,8 +80,8 @@ test "parse false literal" {
         allocator.destroy(expr);
     }
 
-    try testing.expect(expr.constant.value == .boolean);
-    try testing.expect(expr.constant.value.boolean == false);
+    try testing.expect(expr.constant == .boolean);
+    try testing.expect(expr.constant.boolean == false);
 }
 
 test "parse variable reference" {
@@ -125,10 +125,10 @@ test "parse function call with parameters" {
     try testing.expectEqual(@as(usize, 3), expr.function_call.parameters.items.len);
 
     try testing.expect(expr.function_call.parameters.items[0].* == .constant);
-    try testing.expectEqual(@as(f64, 1), expr.function_call.parameters.items[0].constant.value.number);
+    try testing.expectEqual(@as(f64, 1), expr.function_call.parameters.items[0].constant.number);
 
     try testing.expect(expr.function_call.parameters.items[1].* == .constant);
-    try testing.expectEqual(@as(f64, 2), expr.function_call.parameters.items[1].constant.value.number);
+    try testing.expectEqual(@as(f64, 2), expr.function_call.parameters.items[1].constant.number);
 
     try testing.expect(expr.function_call.parameters.items[2].* == .variable);
     try testing.expectEqualStrings("x", expr.function_call.parameters.items[2].variable.name);
@@ -228,7 +228,7 @@ test "parse parenthesized expressions" {
         allocator.destroy(expr);
     }
 
-    try testing.expectEqual(@as(f64, 42), expr.constant.value.number);
+    try testing.expectEqual(@as(f64, 42), expr.constant.number);
 }
 
 test "operator precedence" {
@@ -243,7 +243,7 @@ test "operator precedence" {
     try testing.expectEqual(@as(u8, '+'), expr.binary_operator.value);
 
     try testing.expect(expr.binary_operator.lhs.?.* == .constant);
-    try testing.expectEqual(@as(f64, 2), expr.binary_operator.lhs.?.constant.value.number);
+    try testing.expectEqual(@as(f64, 2), expr.binary_operator.lhs.?.constant.number);
 
     try testing.expect(expr.binary_operator.rhs.?.* == .binary_operator);
     try testing.expectEqual(@as(u8, '*'), expr.binary_operator.rhs.?.binary_operator.value);
@@ -260,7 +260,7 @@ test "parse let statement" {
 
     try testing.expectEqualStrings("x", statement.let.name);
     try testing.expect(statement.let.value.* == .constant);
-    try testing.expectEqual(@as(f64, 42), statement.let.value.constant.value.number);
+    try testing.expectEqual(@as(f64, 42), statement.let.value.constant.number);
 }
 
 test "parse expression statement" {
@@ -338,7 +338,7 @@ test "parse return statement with value" {
 
     try testing.expect(statement.ret.value != null);
     try testing.expect(statement.ret.value.?.* == .constant);
-    try testing.expectEqual(@as(f64, 123), statement.ret.value.?.constant.value.number);
+    try testing.expectEqual(@as(f64, 123), statement.ret.value.?.constant.number);
 }
 
 test "parse if statement" {
@@ -415,4 +415,26 @@ test "parse chained function calls" {
 
     try testing.expect(expr.function_call.parameters.items[0].* == .function_call);
     try testing.expectEqualStrings("inner", expr.function_call.parameters.items[0].function_call.function_name);
+}
+
+test "parse an array" {
+    const allocator = testing.allocator;
+
+    const expr = try expectExpressionType(allocator, "[1, 2, 3]", .constant);
+    defer {
+        expr.deinit(allocator);
+        allocator.destroy(expr);
+    }
+
+    try testing.expect(expr.constant == .array);
+    try testing.expectEqual(@as(usize, 3), expr.constant.array.items.len);
+
+    try testing.expect(expr.constant.array.items[0].* == .constant);
+    try testing.expectEqual(@as(f64, 1), expr.constant.array.items[0].constant.number);
+
+    try testing.expect(expr.constant.array.items[1].* == .constant);
+    try testing.expectEqual(@as(f64, 2), expr.constant.array.items[1].constant.number);
+
+    try testing.expect(expr.constant.array.items[2].* == .constant);
+    try testing.expectEqual(@as(f64, 3), expr.constant.array.items[2].constant.number);
 }

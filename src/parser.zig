@@ -107,7 +107,8 @@ pub const Parser = struct {
 
     fn postfixBindingPower(op: u8) ?u8 {
         return switch (op) {
-            '!' => 7,
+            '!' => 8,
+            '[' => 9,
             else => null,
         };
     }
@@ -118,22 +119,22 @@ pub const Parser = struct {
         var lhs: *e.Expression = switch (lex_item) {
             .number => |num| blk: {
                 const expr_node: *e.Expression = try p.allocator.create(e.Expression);
-                expr_node.* = e.Expression{ .constant = .{ .value = .{ .number = num } } };
+                expr_node.* = e.Expression{ .constant = .{ .number = num } };
                 break :blk expr_node;
             },
             .string => |str| blk: {
                 const expr_node: *e.Expression = try p.allocator.create(e.Expression);
-                expr_node.* = e.Expression{ .constant = .{ .value = .{ .string = str } } };
+                expr_node.* = e.Expression{ .constant = .{ .string = str } };
                 break :blk expr_node;
             },
             .true_literal => blk: {
                 const expr_node: *e.Expression = try p.allocator.create(e.Expression);
-                expr_node.* = e.Expression{ .constant = .{ .value = .{ .boolean = true } } };
+                expr_node.* = e.Expression{ .constant = .{ .boolean = true } };
                 break :blk expr_node;
             },
             .false_literal => blk: {
                 const expr_node: *e.Expression = try p.allocator.create(e.Expression);
-                expr_node.* = e.Expression{ .constant = .{ .value = .{ .boolean = false } } };
+                expr_node.* = e.Expression{ .constant = .{ .boolean = false } };
                 break :blk expr_node;
             },
             .ident => |name| blk: {
@@ -151,7 +152,7 @@ pub const Parser = struct {
 
                 if (p.lexer.peek() != .rparen) {
                     while (true) {
-                        const param_expr = try p.parseExpression();
+                        const param_expr = try p.expression(0);
                         try parameters.append(param_expr);
 
                         const next_token = p.lexer.next();
@@ -188,6 +189,26 @@ pub const Parser = struct {
                 const lhs_expr = try p.expression(0);
                 assert(p.lexer.next() == .rparen);
                 break :blk lhs_expr;
+            },
+            .sq_lbracket => blk: {
+                var elements = std.array_list.Managed(*e.Expression).init(p.allocator);
+
+                while (p.lexer.peek() != .sq_rbracket) {
+                    const element = try p.expression(0);
+
+                    try elements.append(element);
+
+                    if (p.lexer.peek() == .comma) {
+                        _ = p.lexer.next();
+                    }
+                }
+
+                assert(p.lexer.next() == .sq_rbracket);
+
+                const node = try p.allocator.create(e.Expression);
+                node.* = e.Expression{ .constant = .{ .array = elements } };
+
+                break :blk node;
             },
             else => blk: {
                 if (lex_item.getOperatorChar()) |char| {
@@ -252,7 +273,19 @@ pub const Parser = struct {
                 _ = p.lexer.next();
 
                 const new_lhs = try p.allocator.create(e.Expression);
-                new_lhs.* = e.Expression{ .binary_operator = .{ .lhs = lhs, .rhs = null, .value = oper_char } };
+
+                new_lhs.* = switch (oper_char) {
+                    '[' => blk: {
+                        const rhs = try p.expression(0);
+
+                        assert(p.lexer.next() == .sq_rbracket);
+
+                        break :blk e.Expression{ .binary_operator = .{ .lhs = lhs, .rhs = rhs, .value = '[' } };
+                    },
+
+                    else => e.Expression{ .binary_operator = .{ .lhs = lhs, .rhs = null, .value = oper_char } },
+                };
+
                 lhs = new_lhs;
                 continue;
             }

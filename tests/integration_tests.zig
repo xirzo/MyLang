@@ -82,7 +82,7 @@ test "parse complex nested expression" {
     try testing.expectEqual(@as(u8, '*'), expr.binary_operator.lhs.?.binary_operator.value);
 
     try testing.expect(expr.binary_operator.rhs.?.* == .constant);
-    try testing.expectEqual(@as(f64, 2), expr.binary_operator.rhs.?.constant.value.number);
+    try testing.expectEqual(@as(f64, 2), expr.binary_operator.rhs.?.constant.number);
 }
 
 // FREEZES

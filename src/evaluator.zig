@@ -23,12 +23,32 @@ pub const Evaluator = struct {
 
     pub fn evaluate(self: *Evaluator, expr: *e.Expression) EvaluationError!v.Value {
         return switch (expr.*) {
-            .constant => |a| a.value,
+            .constant => |constant| self.evaluateConstant(constant),
             .variable => |vrbl| self.evaluateVariable(vrbl),
             .binary_operator => |o| self.evaluateBinaryOperator(o),
             .function_call => |*function_call| self.evaluateFunctionCall(function_call),
             .comparison_operator => |*comp| self.evaluateComparison(comp.*),
         };
+    }
+
+    fn evaluateConstant(self: *Evaluator, constant: e.Constant) EvaluationError!v.Value {
+        return switch (constant) {
+            .number => |num| v.Value{ .number = num },
+            .string => |str| v.Value{ .string = str },
+            .char => |ch| v.Value{ .char = ch },
+            .boolean => |b| v.Value{ .boolean = b },
+            .array => |arr| self.evaluateArray(arr),
+        };
+    }
+
+    fn evaluateArray(self: *Evaluator, arr: std.array_list.Managed(*e.Expression)) EvaluationError!v.Value {
+        var elements = std.array_list.Managed(v.Value).init(self.program.allocator);
+
+        for (arr.items) |el| {
+            try elements.append(try self.evaluate(el));
+        }
+
+        return v.Value{ .array = elements };
     }
 
     fn evaluateVariable(self: *Evaluator, vrbl: e.Variable) EvaluationError!v.Value {
@@ -50,6 +70,7 @@ pub const Evaluator = struct {
             '*' => try multiplyValues(self.program.allocator, lhs, rhs),
             '/' => try divideValues(lhs, rhs),
             '!' => try factorialValue(lhs),
+            '[' => try indexArray(lhs, rhs),
             else => error.UnsupportedOperator,
         };
     }
@@ -158,6 +179,9 @@ fn addValues(allocator: std.mem.Allocator, lhs: v.Value, rhs: v.Value) Evaluatio
                 .boolean => |_| {
                     return error.TypeMismatch;
                 },
+                .array => |_| {
+                    return error.TypeMismatch;
+                },
                 .none => return lhs,
             }
         },
@@ -190,6 +214,9 @@ fn addValues(allocator: std.mem.Allocator, lhs: v.Value, rhs: v.Value) Evaluatio
                     @memcpy(result[lstr.len..], rstr);
                     return v.Value{ .string = result };
                 },
+                .array => |_| {
+                    return error.TypeMismatch;
+                },
                 .none => return lhs,
             }
         },
@@ -213,6 +240,9 @@ fn addValues(allocator: std.mem.Allocator, lhs: v.Value, rhs: v.Value) Evaluatio
                 .boolean => |_| {
                     return error.TypeMismatch;
                 },
+                .array => |_| {
+                    return error.TypeMismatch;
+                },
                 .none => return lhs,
             }
         },
@@ -234,10 +264,70 @@ fn addValues(allocator: std.mem.Allocator, lhs: v.Value, rhs: v.Value) Evaluatio
                 .boolean => |_| {
                     return error.TypeMismatch;
                 },
+                .array => |_| {
+                    return error.TypeMismatch;
+                },
+                .none => return lhs,
+            }
+        },
+        .array => |larr| {
+            switch (rhs) {
+                .number => |_| {
+                    return error.TypeMismatch;
+                },
+                .string => |_| {
+                    return error.TypeMismatch;
+                },
+                .char => |_| {
+                    return error.TypeMismatch;
+                },
+                .boolean => |_| {
+                    return error.TypeMismatch;
+                },
+                .array => |rarr| {
+                    var result = std.array_list.Managed(v.Value).init(allocator);
+
+                    try result.ensureTotalCapacity(larr.items.len + rarr.items.len);
+
+                    for (larr.items) |item| {
+                        const cloned = try cloneValue(allocator, item);
+                        result.appendAssumeCapacity(cloned);
+                    }
+
+                    for (rarr.items) |item| {
+                        const cloned = try cloneValue(allocator, item);
+                        result.appendAssumeCapacity(cloned);
+                    }
+
+                    return v.Value{ .array = result };
+                },
                 .none => return lhs,
             }
         },
         .none => return rhs,
+    }
+}
+
+fn cloneValue(allocator: std.mem.Allocator, value: v.Value) !v.Value {
+    switch (value) {
+        .number => |n| return v.Value{ .number = n },
+        .string => |str| {
+            const cloned_str = try allocator.alloc(u8, str.len);
+            @memcpy(cloned_str, str);
+            return v.Value{ .string = cloned_str };
+        },
+        .char => |c| return v.Value{ .char = c },
+        .boolean => |b| return v.Value{ .boolean = b },
+        .array => |arr| {
+            var cloned_arr = std.array_list.Managed(v.Value).init(allocator);
+            try cloned_arr.ensureTotalCapacity(arr.items.len);
+            for (arr.items) |item| {
+                const cloned_item = try cloneValue(allocator, item);
+                cloned_arr.appendAssumeCapacity(cloned_item);
+            }
+            return v.Value{ .array = cloned_arr };
+        },
+        .none => return v.Value{ .none = {} },
     }
 }
 
@@ -403,4 +493,28 @@ fn compareValues(lhs: v.Value, rhs: v.Value, op: []const u8) EvaluationError!v.V
     };
 
     return v.Value{ .boolean = result };
+}
+
+fn indexArray(array_val: v.Value, index_val: v.Value) EvaluationError!v.Value {
+    const array = switch (array_val) {
+        .array => |arr| arr,
+        else => return error.TypeMismatch,
+    };
+
+    const index = switch (index_val) {
+        .number => |num| blk: {
+            if (num < 0 or num != @trunc(num)) {
+                return error.InvalidIndex;
+            }
+
+            break :blk @as(usize, @intFromFloat(num));
+        },
+        else => return error.TypeMismatch,
+    };
+
+    if (index >= array.items.len) {
+        return error.IndexOutOfBounds;
+    }
+
+    return array.items[index];
 }
