@@ -408,6 +408,7 @@ pub const Parser = struct {
             .function => try p.parseFunctionDeclaration(),
             .ret => try p.parseReturn(),
             .if_cond => try p.parseIf(),
+            .while_loop => try p.parseWhile(),
             // NOTE: parsing function calls may produce errors when creating expression
             // statement like:
             // x + 5 (cause x is ident is goes before 5),
@@ -653,5 +654,33 @@ pub const Parser = struct {
         self.allocator.destroy(block_stmt);
 
         return if_stmt;
+    }
+
+    fn parseWhile(self: *Parser) ParseError!*stmt.Statement {
+        _ = self.lexer.next();
+
+        const value = try self.parseExpression();
+        const block_stmt = try self.parseBlock();
+
+        const block_ptr = try self.allocator.create(stmt.Block);
+        errdefer self.allocator.destroy(block_ptr);
+
+        switch (block_stmt.*) {
+            .block => |block| {
+                block_ptr.* = block;
+            },
+            else => {
+                self.allocator.destroy(block_ptr);
+                self.allocator.destroy(block_stmt);
+                return error.ParseError;
+            },
+        }
+
+        const while_stmt = try self.allocator.create(stmt.Statement);
+        while_stmt.* = .{ .while_loop = .{ .body = block_ptr, .condition = value } };
+
+        self.allocator.destroy(block_stmt);
+
+        return while_stmt;
     }
 };

@@ -33,6 +33,8 @@ pub const Lexeme = union(enum) {
     true_literal: void,
     false_literal: void,
     if_cond: void,
+    for_loop: void,
+    while_loop: void,
     eol: void,
     eof: void,
 
@@ -135,6 +137,12 @@ pub const Lexer = struct {
         }
         if (std.mem.eql(u8, ident, "if")) {
             return Lexeme{ .if_cond = {} };
+        }
+        if (std.mem.eql(u8, ident, "for")) {
+            return Lexeme{ .for_loop = {} };
+        }
+        if (std.mem.eql(u8, ident, "while")) {
+            return Lexeme{ .while_loop = {} };
         }
         return null;
     }

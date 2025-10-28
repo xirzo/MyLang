@@ -27,6 +27,7 @@ pub fn executeStatement(statement: *stmt.Statement, program: *prog.Program) Exec
         },
         .ret => |*ret| try executeReturn(ret, program),
         .if_cond => |*if_cond| try executeIf(if_cond, program),
+        .while_loop => |*while_loop| try executeWhile(while_loop, program),
     }
 }
 
@@ -65,6 +66,24 @@ fn executeIf(if_stmt: *stmt.If, program: *prog.Program) ExecutionError!void {
     }
 
     try executeBlock(if_stmt.body, program);
+}
+
+fn executeWhile(while_loop: *stmt.While, program: *prog.Program) ExecutionError!void {
+    const value = try program.evaluator.evaluate(while_loop.condition);
+
+    const should_execute = switch (value) {
+        .number => |n| n > 0,
+        .string => |str| str.len > 0,
+        .char => |c| c > 0,
+        .boolean => |b| b == true,
+        .none => false,
+        .array => |arr| arr.items.len > 0,
+        .object => true,
+    };
+
+    while (should_execute) {
+        try executeBlock(while_loop.body, program);
+    }
 }
 
 fn printValue(writer: *std.fs.File.Writer, value: v.Value) !void {

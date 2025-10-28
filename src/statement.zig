@@ -72,6 +72,18 @@ pub const If = struct {
     }
 };
 
+pub const While = struct {
+    condition: *e.Expression,
+    body: *Block,
+
+    pub fn deinit(self: *While, allocator: std.mem.Allocator) void {
+        self.condition.deinit(allocator);
+        allocator.destroy(self.condition);
+        self.body.deinit(allocator);
+        allocator.destroy(self.body);
+    }
+};
+
 pub const Statement = union(enum) {
     let: Let,
     expression: ExpressionStatement,
@@ -80,6 +92,7 @@ pub const Statement = union(enum) {
     builtin_function: BuiltinFunction,
     ret: Return,
     if_cond: If,
+    while_loop: While,
 
     pub fn deinit(self: *Statement, allocator: std.mem.Allocator) void {
         switch (self.*) {
@@ -108,6 +121,7 @@ pub const Statement = union(enum) {
                 }
             },
             .if_cond => |*if_cond| if_cond.deinit(allocator),
+            .while_loop => |*while_loop| while_loop.deinit(allocator),
         }
     }
 };
