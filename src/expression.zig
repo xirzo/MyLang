@@ -67,8 +67,8 @@ pub const ObjectField = struct {
 };
 
 pub const ObjectAccess = struct {
-    object: *Expression,
     key: []const u8,
+    object: *Expression,
 };
 
 pub const Expression = union(enum) {

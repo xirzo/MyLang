@@ -109,6 +109,7 @@ pub const Parser = struct {
         return switch (op) {
             '!' => 8,
             '[' => 9,
+            '.' => 10,
             else => null,
         };
     }
@@ -348,6 +349,15 @@ pub const Parser = struct {
                         assert(p.lexer.next() == .sq_rbracket);
 
                         break :blk e.Expression{ .binary_operator = .{ .lhs = lhs, .rhs = rhs, .value = '[' } };
+                    },
+                    '.' => blk: {
+                        const key_token = p.lexer.next();
+
+                        assert(key_token == .ident);
+
+                        const key = try p.allocator.dupe(u8, key_token.ident);
+
+                        break :blk e.Expression{ .object_access = .{ .key = key, .object = lhs } };
                     },
 
                     else => e.Expression{ .binary_operator = .{ .lhs = lhs, .rhs = null, .value = oper_char } },
