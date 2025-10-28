@@ -19,6 +19,8 @@ pub const Lexeme = union(enum) {
     sq_lbracket: u8,
     bang: u8,
     comma: u8,
+    dot: u8,
+    colon: u8,
     let: void,
     function: void,
     ret: void,
@@ -42,6 +44,7 @@ pub const Lexeme = union(enum) {
             .slash => |char| char,
             .bang => |char| char,
             .sq_lbracket => |char| char,
+            .dot => |char| char,
             else => null,
         };
     }
@@ -188,6 +191,8 @@ pub const Lexer = struct {
             '[' => Lexeme{ .sq_lbracket = l.cur_char },
             ']' => Lexeme{ .sq_rbracket = l.cur_char },
             ',' => Lexeme{ .comma = l.cur_char },
+            '.' => Lexeme{ .dot = l.cur_char },
+            ':' => Lexeme{ .colon = l.cur_char },
             '\n' => Lexeme{ .eol = {} },
             '"' => Lexeme{ .string = l.parseString() },
             '!' => blk: {

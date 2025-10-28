@@ -107,3 +107,43 @@ test "evaluate arrays concat" {
 //
 //     try std.testing.expect(!program.environment.contains("x"));
 // }
+
+test "evaluate object" {
+    const src =
+        \\ let x = {
+        \\   a = 1,
+        \\   b = 2,
+        \\   c = 3
+        \\ };
+    ;
+
+    var program = try mylang.createInterpreter(std.testing.allocator, src);
+    defer {
+        program.deinit();
+        std.testing.allocator.destroy(program);
+    }
+
+    try program.execute();
+    try std.testing.expect(program.environment.get("x").? == .object);
+}
+
+test "evaluate object item access" {
+    const src =
+        \\ let y = {
+        \\   a = 1,
+        \\   b = 2,
+        \\   c = 3
+        \\ };
+        \\
+        \\ let x = y.a;
+    ;
+
+    var program = try mylang.createInterpreter(std.testing.allocator, src);
+    defer {
+        program.deinit();
+        std.testing.allocator.destroy(program);
+    }
+
+    try program.execute();
+    try std.testing.expectEqual(1.0, program.environment.get("x").?.number);
+}

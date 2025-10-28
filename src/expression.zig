@@ -8,6 +8,7 @@ pub const Constant = union(enum) {
     char: u8,
     boolean: bool,
     array: std.array_list.Managed(*Expression),
+    object: std.array_list.Managed(ObjectField),
 
     pub fn deinit(self: *Constant, allocator: std.mem.Allocator) void {
         switch (self.*) {
@@ -17,6 +18,14 @@ pub const Constant = union(enum) {
                     allocator.destroy(el);
                 }
                 arr.deinit();
+            },
+            .object => |*obj| {
+                for (obj.items) |*field| {
+                    allocator.free(field.key);
+                    field.value.deinit(allocator);
+                    allocator.destroy(field.value);
+                }
+                obj.deinit();
             },
             else => {},
         }
@@ -52,12 +61,23 @@ pub const ComparisonOperator = struct {
     op: []const u8,
 };
 
+pub const ObjectField = struct {
+    key: []const u8,
+    value: *Expression,
+};
+
+pub const ObjectAccess = struct {
+    key: []const u8,
+    object: *Expression,
+};
+
 pub const Expression = union(enum) {
     constant: Constant,
     variable: Variable,
     binary_operator: BinaryOperator,
     function_call: FunctionCall,
     comparison_operator: ComparisonOperator,
+    object_access: ObjectAccess,
 
     pub fn deinit(self: *Expression, allocator: std.mem.Allocator) void {
         switch (self.*) {
@@ -81,6 +101,11 @@ pub const Expression = union(enum) {
                 allocator.destroy(comp_op.lhs);
                 comp_op.rhs.deinit(allocator);
                 allocator.destroy(comp_op.rhs);
+            },
+            .object_access => |*obj_access| {
+                obj_access.object.deinit(allocator);
+                allocator.destroy(obj_access.object);
+                allocator.free(obj_access.key);
             },
         }
     }
