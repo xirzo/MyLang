@@ -57,6 +57,7 @@ fn executeIf(if_stmt: *stmt.If, program: *prog.Program) ExecutionError!void {
         .boolean => |b| b == true,
         .none => false,
         .array => |arr| arr.items.len > 0,
+        .object => true,
     };
 
     if (!should_execute) {
@@ -75,6 +76,17 @@ fn printValue(writer: *std.fs.File.Writer, value: v.Value) !void {
         .array => |arr| {
             try writer.interface.print("[", .{});
             for (arr.items, 0..) |item, i| {
+                if (i > 0) {
+                    try writer.interface.print(", ", .{});
+                }
+
+                try printValue(writer, item);
+            }
+            try writer.interface.print("]", .{});
+        },
+        .object => |obj| {
+            try writer.interface.print("[", .{});
+            for (obj.items, 0..) |item, i| {
                 if (i > 0) {
                     try writer.interface.print(", ", .{});
                 }

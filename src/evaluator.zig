@@ -182,6 +182,7 @@ fn addValues(allocator: std.mem.Allocator, lhs: v.Value, rhs: v.Value) Evaluatio
                 .array => |_| {
                     return error.TypeMismatch;
                 },
+                .object => return error.TypeMismatch,
                 .none => return lhs,
             }
         },
@@ -217,6 +218,7 @@ fn addValues(allocator: std.mem.Allocator, lhs: v.Value, rhs: v.Value) Evaluatio
                 .array => |_| {
                     return error.TypeMismatch;
                 },
+                .object => return error.TypeMismatch,
                 .none => return lhs,
             }
         },
@@ -243,6 +245,7 @@ fn addValues(allocator: std.mem.Allocator, lhs: v.Value, rhs: v.Value) Evaluatio
                 .array => |_| {
                     return error.TypeMismatch;
                 },
+                .object => return error.TypeMismatch,
                 .none => return lhs,
             }
         },
@@ -267,6 +270,7 @@ fn addValues(allocator: std.mem.Allocator, lhs: v.Value, rhs: v.Value) Evaluatio
                 .array => |_| {
                     return error.TypeMismatch;
                 },
+                .object => return error.TypeMismatch,
                 .none => return lhs,
             }
         },
@@ -301,9 +305,11 @@ fn addValues(allocator: std.mem.Allocator, lhs: v.Value, rhs: v.Value) Evaluatio
 
                     return v.Value{ .array = result };
                 },
+                .object => return error.TypeMismatch,
                 .none => return lhs,
             }
         },
+        .object => return error.TypeMismatch,
         .none => return rhs,
     }
 }
@@ -328,6 +334,17 @@ fn cloneValue(allocator: std.mem.Allocator, value: v.Value) !v.Value {
             return v.Value{ .array = cloned_arr };
         },
         .none => return v.Value{ .none = {} },
+        .object => |obj| {
+            var cloned_object = std.array_list.Managed(v.Value).init(allocator);
+            try cloned_object.ensureTotalCapacity(obj.items.len);
+
+            for (obj.items) |item| {
+                const cloned_item = try cloneValue(allocator, item);
+                cloned_object.appendAssumeCapacity(cloned_item);
+            }
+
+            return v.Value{ .object = cloned_object };
+        },
     }
 }
 

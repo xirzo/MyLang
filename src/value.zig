@@ -7,6 +7,7 @@ pub const Value = union(enum) {
     boolean: bool,
     array: std.array_list.Managed(Value),
     none: void,
+    object: std.array_list.Managed(Value),
 
     pub fn deinit(self: *Value, allocator: std.mem.Allocator) void {
         switch (self.*) {
@@ -20,6 +21,12 @@ pub const Value = union(enum) {
                 if (str.len > 0) {
                     allocator.free(str);
                 }
+            },
+            .object => {
+                for (self.object.items) |*item| {
+                    item.deinit(allocator);
+                }
+                self.object.deinit();
             },
             else => {},
         }
