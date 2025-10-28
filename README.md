@@ -28,25 +28,33 @@ Run the executable
 ### sample.my
 
 ```
-fn sample() {
-    ret 5;
+fn fib(n) {
+    if n <= 1 {
+        ret n;
+    }
+
+    ret fib(n-1) + fib(n-2);
 }
 
-let x = sample();
-println(x);
+println(fib(5));
 ```
 
 ## Features
 
+- [x] structs (as objects)
+- [x] if statements
 - [x] built-in functions (e.g. println)
-- [x] blocks
 - [x] function declarations
 - [x] function calls 
+- [x] blocks
 - [x] let statements
 - [x] return statements
 - [x] infix operators
 - [x] prefix operators
 - [x] postfix operators
+- [] else statements
+- [] for loops
+- [] while loops
 
 ## Sources
 
