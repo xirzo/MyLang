@@ -84,6 +84,11 @@ pub const While = struct {
     }
 };
 
+pub const Assignment = struct {
+    name: []const u8,
+    value: *e.Expression,
+};
+
 pub const Statement = union(enum) {
     let: Let,
     expression: ExpressionStatement,
@@ -93,6 +98,7 @@ pub const Statement = union(enum) {
     ret: Return,
     if_cond: If,
     while_loop: While,
+    assignment: Assignment,
 
     pub fn deinit(self: *Statement, allocator: std.mem.Allocator) void {
         switch (self.*) {
@@ -122,6 +128,11 @@ pub const Statement = union(enum) {
             },
             .if_cond => |*if_cond| if_cond.deinit(allocator),
             .while_loop => |*while_loop| while_loop.deinit(allocator),
+            .assignment => |*assign_stmt| {
+                allocator.free(assign_stmt.name);
+                assign_stmt.value.deinit(allocator);
+                allocator.destroy(assign_stmt.value);
+            },
         }
     }
 };

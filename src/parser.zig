@@ -413,6 +413,16 @@ pub const Parser = struct {
             // statement like:
             // x + 5 (cause x is ident is goes before 5),
             // 5 + x should work
+            .ident => blk: {
+                if (p.lexer.checkNextToken(.assign)) {
+                    break :blk try p.parseAssignment();
+                } else {
+                    const expr_node = try p.parseExpression();
+                    const stmt_node = try p.allocator.create(stmt.Statement);
+                    stmt_node.* = stmt.Statement{ .expression = .{ .expression = expr_node } };
+                    break :blk stmt_node;
+                }
+            },
             else => blk: {
                 if (tok == .semicolon or tok == .eol or tok == .eof) {
                     return null;
@@ -682,5 +692,36 @@ pub const Parser = struct {
         self.allocator.destroy(block_stmt);
 
         return while_stmt;
+    }
+
+    fn parseAssignment(p: *Parser) ParseError!*stmt.Statement {
+        const ident_lex = p.lexer.next();
+
+        if (ident_lex != .ident) {
+            std.log.err("expected identifier for assignment, got {any}", .{ident_lex});
+            return error.ExpectedIdentifier;
+        }
+
+        const var_name = ident_lex.ident;
+        const name_copy = try p.allocator.dupe(u8, var_name);
+
+        const equal_lex = p.lexer.next();
+        if (equal_lex != .assign) {
+            std.log.err("expected '=' after variable name, got {any}", .{equal_lex});
+            p.allocator.free(name_copy);
+            return error.ExpectedAssignment;
+        }
+
+        const value = try p.parseExpression();
+
+        const assign_stmt = try p.allocator.create(stmt.Statement);
+        assign_stmt.* = stmt.Statement{
+            .assignment = .{
+                .name = name_copy,
+                .value = value,
+            },
+        };
+
+        return assign_stmt;
     }
 };

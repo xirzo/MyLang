@@ -28,6 +28,16 @@ pub fn executeStatement(statement: *stmt.Statement, program: *prog.Program) Exec
         .ret => |*ret| try executeReturn(ret, program),
         .if_cond => |*if_cond| try executeIf(if_cond, program),
         .while_loop => |*while_loop| try executeWhile(while_loop, program),
+        .assignment => |*assign_stmt| {
+            if (!program.environment.contains(assign_stmt.name)) {
+                std.log.err("undefined variable: {s}", .{assign_stmt.name});
+                return error.UndefinedVariable;
+            }
+
+            const value = try program.evaluator.evaluate(assign_stmt.value);
+
+            try program.environment.put(assign_stmt.name, value);
+        },
     }
 }
 

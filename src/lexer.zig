@@ -64,6 +64,12 @@ pub const Lexeme = union(enum) {
     }
 };
 
+const LexerState = struct {
+    cur_pos: usize,
+    read_pos: usize,
+    cur_char: u8,
+};
+
 pub const Lexer = struct {
     src: []const u8,
     cur_pos: usize,
@@ -80,6 +86,20 @@ pub const Lexer = struct {
 
         l.readChar();
         return l;
+    }
+
+    fn saveState(l: *const Lexer) LexerState {
+        return LexerState{
+            .cur_pos = l.cur_pos,
+            .read_pos = l.read_pos,
+            .cur_char = l.cur_char,
+        };
+    }
+
+    fn restoreState(l: *Lexer, state: LexerState) void {
+        l.cur_pos = state.cur_pos;
+        l.read_pos = state.read_pos;
+        l.cur_char = state.cur_char;
     }
 
     fn readChar(l: *Lexer) void {
@@ -259,16 +279,42 @@ pub const Lexer = struct {
     }
 
     pub fn peek(l: *Lexer) Lexeme {
-        const cur_char: u8 = l.cur_char;
-        const cur_pos: usize = l.cur_pos;
-        const read_pos: usize = l.read_pos;
+        const saved_state = l.saveState();
+        const token = l.next();
+        l.restoreState(saved_state);
+        return token;
+    }
 
-        const lex: Lexeme = l.next();
+    pub fn peekNext(l: *Lexer) Lexeme {
+        const saved_state = l.saveState();
+        _ = l.next();
+        const next_token = l.next();
+        l.restoreState(saved_state);
+        return next_token;
+    }
 
-        l.cur_char = cur_char;
-        l.cur_pos = cur_pos;
-        l.read_pos = read_pos;
+    pub fn peekAhead(l: *Lexer, offset: usize) Lexeme {
+        const saved_state = l.saveState();
+        var i: usize = 0;
+        var token = Lexeme{ .eof = {} };
 
-        return lex;
+        while (i <= offset) {
+            token = l.next();
+            if (token == .eof) break;
+            i += 1;
+        }
+
+        l.restoreState(saved_state);
+        return token;
+    }
+
+    pub fn checkToken(l: *Lexer, expected: std.meta.Tag(Lexeme)) bool {
+        const token = l.peek();
+        return @as(std.meta.Tag(Lexeme), token) == expected;
+    }
+
+    pub fn checkNextToken(l: *Lexer, expected: std.meta.Tag(Lexeme)) bool {
+        const token = l.peekNext();
+        return @as(std.meta.Tag(Lexeme), token) == expected;
     }
 };
