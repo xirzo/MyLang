@@ -10,11 +10,11 @@ pub const Value = union(enum) {
 
     pub fn deinit(self: *Value, allocator: std.mem.Allocator) void {
         switch (self.*) {
-            .array => |*arr| {
-                for (arr.items) |*item| {
+            .array => {
+                for (self.array.items) |*item| {
                     item.deinit(allocator);
                 }
-                arr.deinit();
+                self.array.deinit();
             },
             .string => |str| {
                 if (str.len > 0) {

@@ -285,16 +285,49 @@ fn addValues(allocator: std.mem.Allocator, lhs: v.Value, rhs: v.Value) Evaluatio
                     return error.TypeMismatch;
                 },
                 .array => |rarr| {
-                    // NOTE: is this how you do that?
-                    const result = try allocator.alloc(v.Value, larr.items.len + rarr.items.len);
-                    @memcpy(result[0..larr.items.len], larr.items.ptr);
-                    @memcpy(result[larr.items.len..], rarr.items.ptr);
-                    return v.Value{ .array = larr };
+                    var result = std.array_list.Managed(v.Value).init(allocator);
+
+                    try result.ensureTotalCapacity(larr.items.len + rarr.items.len);
+
+                    for (larr.items) |item| {
+                        const cloned = try cloneValue(allocator, item);
+                        result.appendAssumeCapacity(cloned);
+                    }
+
+                    for (rarr.items) |item| {
+                        const cloned = try cloneValue(allocator, item);
+                        result.appendAssumeCapacity(cloned);
+                    }
+
+                    return v.Value{ .array = result };
                 },
                 .none => return lhs,
             }
         },
         .none => return rhs,
+    }
+}
+
+fn cloneValue(allocator: std.mem.Allocator, value: v.Value) !v.Value {
+    switch (value) {
+        .number => |n| return v.Value{ .number = n },
+        .string => |str| {
+            const cloned_str = try allocator.alloc(u8, str.len);
+            @memcpy(cloned_str, str);
+            return v.Value{ .string = cloned_str };
+        },
+        .char => |c| return v.Value{ .char = c },
+        .boolean => |b| return v.Value{ .boolean = b },
+        .array => |arr| {
+            var cloned_arr = std.array_list.Managed(v.Value).init(allocator);
+            try cloned_arr.ensureTotalCapacity(arr.items.len);
+            for (arr.items) |item| {
+                const cloned_item = try cloneValue(allocator, item);
+                cloned_arr.appendAssumeCapacity(cloned_item);
+            }
+            return v.Value{ .array = cloned_arr };
+        },
+        .none => return v.Value{ .none = {} },
     }
 }
 

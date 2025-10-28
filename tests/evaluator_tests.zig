@@ -58,6 +58,23 @@ test "evaluate array ith element" {
     try std.testing.expectEqual(1.0, program.environment.get("x").?.array.items[0].number);
 }
 
+test "evaluate arrays concat" {
+    const src =
+        \\ let x = [1, 2, 3];
+        \\ let y = [4, 5, 6];
+        \\ let z = x + y;
+    ;
+
+    var program = try mylang.createInterpreter(std.testing.allocator, src);
+    defer {
+        program.deinit();
+        std.testing.allocator.destroy(program);
+    }
+
+    try program.execute();
+    try std.testing.expectEqual(6, program.environment.get("z").?.array.items.len);
+}
+
 // test "evaluate an array" {
 //     const src = "let x = [1, 2, 3];";
 //
