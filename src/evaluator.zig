@@ -28,6 +28,7 @@ pub const Evaluator = struct {
             .binary_operator => |o| self.evaluateBinaryOperator(o),
             .function_call => |*function_call| self.evaluateFunctionCall(function_call),
             .comparison_operator => |*comp| self.evaluateComparison(comp.*),
+            .object_access => |obj_access| self.evaluateObjectAccess(obj_access),
         };
     }
 
@@ -38,6 +39,7 @@ pub const Evaluator = struct {
             .char => |ch| v.Value{ .char = ch },
             .boolean => |b| v.Value{ .boolean = b },
             .array => |arr| self.evaluateArray(arr),
+            .object => |obj_fields| self.evaluateObject(obj_fields),
         };
     }
 
@@ -145,6 +147,28 @@ pub const Evaluator = struct {
         const rhs = try self.evaluate(comp.rhs);
 
         return compareValues(lhs, rhs, comp.op);
+    }
+
+    fn evaluateObject(self: *Evaluator, obj_fields: std.array_list.Managed(e.ObjectField)) EvaluationError!v.Value {
+        var object = std.StringHashMap(v.Value).init(self.program.allocator);
+
+        for (obj_fields.items) |field| {
+            const value = try self.evaluate(field.value);
+            try object.put(field.key, value);
+        }
+
+        return v.Value{ .object = object };
+    }
+
+    fn evaluateObjectAccess(self: *Evaluator, obj_access: e.ObjectAccess) EvaluationError!v.Value {
+        const object_value = try self.evaluate(obj_access.object);
+
+        const object = switch (object_value) {
+            .object => |obj| obj,
+            else => return error.TypeMismatch,
+        };
+
+        return object.get(obj_access.key) orelse error.UndefinedProperty;
     }
 };
 
@@ -333,18 +357,16 @@ fn cloneValue(allocator: std.mem.Allocator, value: v.Value) !v.Value {
             }
             return v.Value{ .array = cloned_arr };
         },
-        .none => return v.Value{ .none = {} },
         .object => |obj| {
-            var cloned_object = std.array_list.Managed(v.Value).init(allocator);
-            try cloned_object.ensureTotalCapacity(obj.items.len);
-
-            for (obj.items) |item| {
-                const cloned_item = try cloneValue(allocator, item);
-                cloned_object.appendAssumeCapacity(cloned_item);
+            var cloned_object = std.StringHashMap(v.Value).init(allocator);
+            var iterator = obj.iterator();
+            while (iterator.next()) |entry| {
+                const cloned_value = try cloneValue(allocator, entry.value_ptr.*);
+                try cloned_object.put(entry.key_ptr.*, cloned_value);
             }
-
             return v.Value{ .object = cloned_object };
         },
+        .none => return v.Value{ .none = {} },
     }
 }
 

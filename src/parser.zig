@@ -210,6 +210,73 @@ pub const Parser = struct {
 
                 break :blk node;
             },
+            .lbrace => blk: {
+                var object_fields = std.array_list.Managed(e.ObjectField).init(p.allocator);
+                errdefer {
+                    for (object_fields.items) |*field| {
+                        p.allocator.free(field.key);
+                        field.value.deinit(p.allocator);
+                        p.allocator.destroy(field.value);
+                    }
+                    object_fields.deinit();
+                }
+
+                while (p.lexer.peek() != .rbrace) {
+                    while (p.lexer.peek() == .eol) {
+                        _ = p.lexer.next();
+                    }
+
+                    if (p.lexer.peek() == .rbrace) {
+                        break;
+                    }
+
+                    const key_token = p.lexer.next();
+                    const key = switch (key_token) {
+                        .ident => |name| try p.allocator.dupe(u8, name),
+                        .string => |str| try p.allocator.dupe(u8, str),
+                        else => {
+                            std.log.err("expected identifier or string for object key, got {any}", .{key_token});
+                            return error.ExpectedIdentifier;
+                        },
+                    };
+                    errdefer p.allocator.free(key);
+
+                    const assign_token = p.lexer.next();
+                    if (assign_token != .assign) {
+                        std.log.err("expected '=' after object key, got {any}", .{assign_token});
+                        p.allocator.free(key);
+                        return error.ExpectedAssignment;
+                    }
+
+                    const value = try p.expression(0);
+
+                    try object_fields.append(e.ObjectField{
+                        .key = key,
+                        .value = value,
+                    });
+
+                    while (p.lexer.peek() == .eol) {
+                        _ = p.lexer.next();
+                    }
+
+                    if (p.lexer.peek() == .comma) {
+                        _ = p.lexer.next();
+                        while (p.lexer.peek() == .eol) {
+                            _ = p.lexer.next();
+                        }
+                    } else if (p.lexer.peek() != .rbrace) {
+                        std.log.err("expected ',' or '}}' in object literal, got {any}", .{p.lexer.peek()});
+                        return error.MissingComma;
+                    }
+                }
+
+                assert(p.lexer.next() == .rbrace);
+
+                const node = try p.allocator.create(e.Expression);
+                node.* = e.Expression{ .constant = .{ .object = object_fields } };
+
+                break :blk node;
+            },
             else => blk: {
                 if (lex_item.getOperatorChar()) |char| {
                     if (prefixBindingPower(char)) |r_bp| {

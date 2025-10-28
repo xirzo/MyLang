@@ -85,15 +85,23 @@ fn printValue(writer: *std.fs.File.Writer, value: v.Value) !void {
             try writer.interface.print("]", .{});
         },
         .object => |obj| {
-            try writer.interface.print("[", .{});
-            for (obj.items, 0..) |item, i| {
-                if (i > 0) {
+            try writer.interface.print("{{", .{});
+
+            var iterator = obj.iterator();
+            var first = true;
+
+            while (iterator.next()) |entry| {
+                if (!first) {
                     try writer.interface.print(", ", .{});
                 }
+                first = false;
 
-                try printValue(writer, item);
+                try writer.interface.print("{s}: ", .{entry.key_ptr.*});
+
+                try printValue(writer, entry.value_ptr.*);
             }
-            try writer.interface.print("]", .{});
+
+            try writer.interface.print("}}", .{});
         },
         .none => try writer.interface.print("(none)", .{}),
     }

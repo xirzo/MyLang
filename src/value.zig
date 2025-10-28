@@ -7,7 +7,7 @@ pub const Value = union(enum) {
     boolean: bool,
     array: std.array_list.Managed(Value),
     none: void,
-    object: std.array_list.Managed(Value),
+    object: std.StringHashMap(Value),
 
     pub fn deinit(self: *Value, allocator: std.mem.Allocator) void {
         switch (self.*) {
@@ -23,9 +23,13 @@ pub const Value = union(enum) {
                 }
             },
             .object => {
-                for (self.object.items) |*item| {
-                    item.deinit(allocator);
+                var it = self.object.iterator();
+
+                while (it.next()) |entry| {
+                    var value = entry.value_ptr;
+                    value.deinit(allocator);
                 }
+
                 self.object.deinit();
             },
             else => {},

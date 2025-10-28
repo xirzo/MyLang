@@ -14,6 +14,7 @@ pub const EvaluationError = error{
     WriteFailed,
     InvalidIndex,
     IndexOutOfBounds,
+    UndefinedProperty,
 };
 
 pub const ExecutionError = EvaluationError;
