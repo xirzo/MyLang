@@ -139,7 +139,7 @@ pub const Parser = struct {
                 break :blk expr_node;
             },
             .ident => |name| blk: {
-                if (p.lexer.peek() != .lparen) {
+                if (!p.lexer.checkToken(.lparen)) {
                     // just a variable
                     const name_copy = try p.allocator.dupe(u8, name);
                     const expr_node: *e.Expression = try p.allocator.create(e.Expression);
@@ -151,7 +151,7 @@ pub const Parser = struct {
 
                 var parameters = std.array_list.Managed(*e.Expression).init(p.allocator);
 
-                if (p.lexer.peek() != .rparen) {
+                if (!p.lexer.checkToken(.rparen)) {
                     while (true) {
                         const param_expr = try p.expression(0);
                         try parameters.append(param_expr);
@@ -194,12 +194,12 @@ pub const Parser = struct {
             .sq_lbracket => blk: {
                 var elements = std.array_list.Managed(*e.Expression).init(p.allocator);
 
-                while (p.lexer.peek() != .sq_rbracket) {
+                while (!p.lexer.checkToken(.sq_rbracket)) {
                     const element = try p.expression(0);
 
                     try elements.append(element);
 
-                    if (p.lexer.peek() == .comma) {
+                    if (p.lexer.checkToken(.comma)) {
                         _ = p.lexer.next();
                     }
                 }
@@ -222,12 +222,12 @@ pub const Parser = struct {
                     object_fields.deinit();
                 }
 
-                while (p.lexer.peek() != .rbrace) {
-                    while (p.lexer.peek() == .eol) {
+                while (!p.lexer.checkToken(.rbrace)) {
+                    while (p.lexer.checkToken(.eol)) {
                         _ = p.lexer.next();
                     }
 
-                    if (p.lexer.peek() == .rbrace) {
+                    if (p.lexer.checkToken(.rbrace)) {
                         break;
                     }
 
@@ -256,16 +256,16 @@ pub const Parser = struct {
                         .value = value,
                     });
 
-                    while (p.lexer.peek() == .eol) {
+                    while (p.lexer.checkToken(.eol)) {
                         _ = p.lexer.next();
                     }
 
-                    if (p.lexer.peek() == .comma) {
+                    if (p.lexer.checkToken(.comma)) {
                         _ = p.lexer.next();
-                        while (p.lexer.peek() == .eol) {
+                        while (p.lexer.checkToken(.eol)) {
                             _ = p.lexer.next();
                         }
-                    } else if (p.lexer.peek() != .rbrace) {
+                    } else if (!p.lexer.checkToken(.rbrace)) {
                         std.log.err("expected ',' or '}}' in object literal, got {any}", .{p.lexer.peek()});
                         return error.MissingComma;
                     }
@@ -409,10 +409,6 @@ pub const Parser = struct {
             .ret => try p.parseReturn(),
             .if_cond => try p.parseIf(),
             .while_loop => try p.parseWhile(),
-            // NOTE: parsing function calls may produce errors when creating expression
-            // statement like:
-            // x + 5 (cause x is ident is goes before 5),
-            // 5 + x should work
             .ident => blk: {
                 if (p.lexer.checkNextToken(.assign)) {
                     break :blk try p.parseAssignment();
@@ -471,7 +467,7 @@ pub const Parser = struct {
     }
 
     fn parseBlock(p: *Parser) ParseError!*stmt.Statement {
-        if (p.lexer.peek() != .lbrace) {
+        if (!p.lexer.checkToken(.lbrace)) {
             std.log.err("expected '{{' at start of block, got {s}", .{@tagName(p.lexer.peek())});
             return error.MissingOpeningBrace;
         }
@@ -490,13 +486,13 @@ pub const Parser = struct {
             block_environment.deinit();
         }
 
-        while (p.lexer.peek() != .rbrace) {
-            if (p.lexer.peek() == .eof) {
+        while (!p.lexer.checkToken(.rbrace)) {
+            if (p.lexer.checkToken(.eof)) {
                 std.log.err("unexpected end of file while parsing block", .{});
                 return error.UnexpectedEOF;
             }
 
-            if (p.lexer.peek() == .eol) {
+            if (p.lexer.checkToken(.eol)) {
                 _ = p.lexer.next();
                 continue;
             }
@@ -541,7 +537,7 @@ pub const Parser = struct {
 
         var parameters = std.array_list.Managed([]const u8).init(p.allocator);
 
-        if (p.lexer.peek() != .rparen) {
+        if (!p.lexer.checkToken(.rparen)) {
             while (true) {
                 const param_lex = p.lexer.next();
 
