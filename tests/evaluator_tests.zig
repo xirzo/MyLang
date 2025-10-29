@@ -167,6 +167,21 @@ test "evaluate while loop" {
     try std.testing.expectEqual(5.0, program.environment.get("x").?.number);
 }
 
+test "evaluate for loop" {
+    const src =
+        \\ for let x = 1; x < 5; x = x  + 1 { }
+    ;
+
+    var program = try mylang.createInterpreter(std.testing.allocator, src);
+    defer {
+        program.deinit();
+        std.testing.allocator.destroy(program);
+    }
+
+    try program.execute();
+    try std.testing.expectEqual(5.0, program.environment.get("x").?.number);
+}
+
 test "variable reassignment" {
     const src =
         \\ let x = 5;

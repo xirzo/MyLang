@@ -409,6 +409,7 @@ pub const Parser = struct {
             .ret => try p.parseReturn(),
             .if_cond => try p.parseIf(),
             .while_loop => try p.parseWhile(),
+            .for_loop => try p.parseFor(),
             .ident => blk: {
                 if (p.lexer.checkNextToken(.assign)) {
                     break :blk try p.parseAssignment();
@@ -688,6 +689,97 @@ pub const Parser = struct {
         self.allocator.destroy(block_stmt);
 
         return while_stmt;
+    }
+
+    fn parseFor(self: *Parser) ParseError!*stmt.Statement {
+        _ = self.lexer.next(); // consume 'for'
+
+        const init_stmt = try self.parseStatement();
+        if (init_stmt == null) {
+            return error.ParseError;
+        }
+
+        if (!self.lexer.checkToken(.semicolon)) {
+            if (init_stmt) |stmtt| {
+                stmtt.deinit(self.allocator);
+                self.allocator.destroy(stmtt);
+            }
+            return error.ExpectedSemicolon;
+        }
+        _ = self.lexer.next();
+
+        const condition = try self.parseExpression();
+
+        if (!self.lexer.checkToken(.semicolon)) {
+            condition.deinit(self.allocator);
+            self.allocator.destroy(condition);
+
+            if (init_stmt) |stmtt| {
+                stmtt.deinit(self.allocator);
+                self.allocator.destroy(stmtt);
+            }
+            return error.ExpectedSemicolon;
+        }
+        _ = self.lexer.next();
+
+        const increment = try self.parseStatement();
+        if (increment == null) {
+            condition.deinit(self.allocator);
+            self.allocator.destroy(condition);
+            if (init_stmt) |stmtt| {
+                stmtt.deinit(self.allocator);
+                self.allocator.destroy(stmtt);
+            }
+            return error.ParseError;
+        }
+
+        const block_stmt = try self.parseBlock();
+        const block_ptr = try self.allocator.create(stmt.Block);
+        errdefer self.allocator.destroy(block_ptr);
+
+        switch (block_stmt.*) {
+            .block => |block| {
+                block_ptr.* = block;
+            },
+            else => {
+                self.allocator.destroy(block_ptr);
+                block_stmt.deinit(self.allocator);
+                self.allocator.destroy(block_stmt);
+                return error.ParseError;
+            },
+        }
+
+        const init_ptr = try self.allocator.create(stmt.Let);
+        errdefer self.allocator.destroy(init_ptr);
+
+        switch (init_stmt.?.*) {
+            .let => |let| {
+                init_ptr.* = let;
+            },
+            else => {
+                self.allocator.destroy(init_ptr);
+                if (init_stmt) |stmtt| {
+                    stmtt.deinit(self.allocator);
+                    self.allocator.destroy(stmtt);
+                }
+                return error.ParseError;
+            },
+        }
+
+        const for_stmt = try self.allocator.create(stmt.Statement);
+        for_stmt.* = .{ .for_loop = .{
+            .init = init_ptr,
+            .condition = condition,
+            .increment = increment.?,
+            .body = block_ptr,
+        } };
+
+        self.allocator.destroy(block_stmt);
+        if (init_stmt) |stmtt| {
+            self.allocator.destroy(stmtt);
+        }
+
+        return for_stmt;
     }
 
     fn parseAssignment(p: *Parser) ParseError!*stmt.Statement {
