@@ -79,20 +79,28 @@ fn executeIf(if_stmt: *stmt.If, program: *prog.Program) ExecutionError!void {
 }
 
 fn executeWhile(while_loop: *stmt.While, program: *prog.Program) ExecutionError!void {
-    const value = try program.evaluator.evaluate(while_loop.condition);
+    while (true) {
+        const value = try program.evaluator.evaluate(while_loop.condition);
 
-    const should_execute = switch (value) {
-        .number => |n| n > 0,
-        .string => |str| str.len > 0,
-        .char => |c| c > 0,
-        .boolean => |b| b == true,
-        .none => false,
-        .array => |arr| arr.items.len > 0,
-        .object => true,
-    };
+        const should_execute = switch (value) {
+            .number => |n| n > 0,
+            .string => |str| str.len > 0,
+            .char => |c| c > 0,
+            .boolean => |b| b == true,
+            .none => false,
+            .array => |arr| arr.items.len > 0,
+            .object => true,
+        };
 
-    while (should_execute) {
+        if (!should_execute) {
+            break;
+        }
+
         try executeBlock(while_loop.body, program);
+
+        if (program.should_return) {
+            return;
+        }
     }
 }
 
