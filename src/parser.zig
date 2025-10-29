@@ -139,7 +139,7 @@ pub const Parser = struct {
                 break :blk expr_node;
             },
             .ident => |name| blk: {
-                if (p.lexer.peek() != .lparen) {
+                if (!p.lexer.checkToken(.lparen)) {
                     // just a variable
                     const name_copy = try p.allocator.dupe(u8, name);
                     const expr_node: *e.Expression = try p.allocator.create(e.Expression);
@@ -151,7 +151,7 @@ pub const Parser = struct {
 
                 var parameters = std.array_list.Managed(*e.Expression).init(p.allocator);
 
-                if (p.lexer.peek() != .rparen) {
+                if (!p.lexer.checkToken(.rparen)) {
                     while (true) {
                         const param_expr = try p.expression(0);
                         try parameters.append(param_expr);
@@ -194,12 +194,12 @@ pub const Parser = struct {
             .sq_lbracket => blk: {
                 var elements = std.array_list.Managed(*e.Expression).init(p.allocator);
 
-                while (p.lexer.peek() != .sq_rbracket) {
+                while (!p.lexer.checkToken(.sq_rbracket)) {
                     const element = try p.expression(0);
 
                     try elements.append(element);
 
-                    if (p.lexer.peek() == .comma) {
+                    if (p.lexer.checkToken(.comma)) {
                         _ = p.lexer.next();
                     }
                 }
@@ -222,12 +222,12 @@ pub const Parser = struct {
                     object_fields.deinit();
                 }
 
-                while (p.lexer.peek() != .rbrace) {
-                    while (p.lexer.peek() == .eol) {
+                while (!p.lexer.checkToken(.rbrace)) {
+                    while (p.lexer.checkToken(.eol)) {
                         _ = p.lexer.next();
                     }
 
-                    if (p.lexer.peek() == .rbrace) {
+                    if (p.lexer.checkToken(.rbrace)) {
                         break;
                     }
 
@@ -256,16 +256,16 @@ pub const Parser = struct {
                         .value = value,
                     });
 
-                    while (p.lexer.peek() == .eol) {
+                    while (p.lexer.checkToken(.eol)) {
                         _ = p.lexer.next();
                     }
 
-                    if (p.lexer.peek() == .comma) {
+                    if (p.lexer.checkToken(.comma)) {
                         _ = p.lexer.next();
-                        while (p.lexer.peek() == .eol) {
+                        while (p.lexer.checkToken(.eol)) {
                             _ = p.lexer.next();
                         }
-                    } else if (p.lexer.peek() != .rbrace) {
+                    } else if (!p.lexer.checkToken(.rbrace)) {
                         std.log.err("expected ',' or '}}' in object literal, got {any}", .{p.lexer.peek()});
                         return error.MissingComma;
                     }
@@ -408,10 +408,18 @@ pub const Parser = struct {
             .function => try p.parseFunctionDeclaration(),
             .ret => try p.parseReturn(),
             .if_cond => try p.parseIf(),
-            // NOTE: parsing function calls may produce errors when creating expression
-            // statement like:
-            // x + 5 (cause x is ident is goes before 5),
-            // 5 + x should work
+            .while_loop => try p.parseWhile(),
+            .for_loop => try p.parseFor(),
+            .ident => blk: {
+                if (p.lexer.checkNextToken(.assign)) {
+                    break :blk try p.parseAssignment();
+                } else {
+                    const expr_node = try p.parseExpression();
+                    const stmt_node = try p.allocator.create(stmt.Statement);
+                    stmt_node.* = stmt.Statement{ .expression = .{ .expression = expr_node } };
+                    break :blk stmt_node;
+                }
+            },
             else => blk: {
                 if (tok == .semicolon or tok == .eol or tok == .eof) {
                     return null;
@@ -460,7 +468,7 @@ pub const Parser = struct {
     }
 
     fn parseBlock(p: *Parser) ParseError!*stmt.Statement {
-        if (p.lexer.peek() != .lbrace) {
+        if (!p.lexer.checkToken(.lbrace)) {
             std.log.err("expected '{{' at start of block, got {s}", .{@tagName(p.lexer.peek())});
             return error.MissingOpeningBrace;
         }
@@ -479,13 +487,13 @@ pub const Parser = struct {
             block_environment.deinit();
         }
 
-        while (p.lexer.peek() != .rbrace) {
-            if (p.lexer.peek() == .eof) {
+        while (!p.lexer.checkToken(.rbrace)) {
+            if (p.lexer.checkToken(.eof)) {
                 std.log.err("unexpected end of file while parsing block", .{});
                 return error.UnexpectedEOF;
             }
 
-            if (p.lexer.peek() == .eol) {
+            if (p.lexer.checkToken(.eol)) {
                 _ = p.lexer.next();
                 continue;
             }
@@ -530,7 +538,7 @@ pub const Parser = struct {
 
         var parameters = std.array_list.Managed([]const u8).init(p.allocator);
 
-        if (p.lexer.peek() != .rparen) {
+        if (!p.lexer.checkToken(.rparen)) {
             while (true) {
                 const param_lex = p.lexer.next();
 
@@ -653,5 +661,155 @@ pub const Parser = struct {
         self.allocator.destroy(block_stmt);
 
         return if_stmt;
+    }
+
+    fn parseWhile(self: *Parser) ParseError!*stmt.Statement {
+        _ = self.lexer.next();
+
+        const value = try self.parseExpression();
+        const block_stmt = try self.parseBlock();
+
+        const block_ptr = try self.allocator.create(stmt.Block);
+        errdefer self.allocator.destroy(block_ptr);
+
+        switch (block_stmt.*) {
+            .block => |block| {
+                block_ptr.* = block;
+            },
+            else => {
+                self.allocator.destroy(block_ptr);
+                self.allocator.destroy(block_stmt);
+                return error.ParseError;
+            },
+        }
+
+        const while_stmt = try self.allocator.create(stmt.Statement);
+        while_stmt.* = .{ .while_loop = .{ .body = block_ptr, .condition = value } };
+
+        self.allocator.destroy(block_stmt);
+
+        return while_stmt;
+    }
+
+    fn parseFor(self: *Parser) ParseError!*stmt.Statement {
+        _ = self.lexer.next(); // consume 'for'
+
+        const init_stmt = try self.parseStatement();
+        if (init_stmt == null) {
+            return error.ParseError;
+        }
+
+        if (!self.lexer.checkToken(.semicolon)) {
+            if (init_stmt) |stmtt| {
+                stmtt.deinit(self.allocator);
+                self.allocator.destroy(stmtt);
+            }
+            return error.ExpectedSemicolon;
+        }
+        _ = self.lexer.next();
+
+        const condition = try self.parseExpression();
+
+        if (!self.lexer.checkToken(.semicolon)) {
+            condition.deinit(self.allocator);
+            self.allocator.destroy(condition);
+
+            if (init_stmt) |stmtt| {
+                stmtt.deinit(self.allocator);
+                self.allocator.destroy(stmtt);
+            }
+            return error.ExpectedSemicolon;
+        }
+        _ = self.lexer.next();
+
+        const increment = try self.parseStatement();
+        if (increment == null) {
+            condition.deinit(self.allocator);
+            self.allocator.destroy(condition);
+            if (init_stmt) |stmtt| {
+                stmtt.deinit(self.allocator);
+                self.allocator.destroy(stmtt);
+            }
+            return error.ParseError;
+        }
+
+        const block_stmt = try self.parseBlock();
+        const block_ptr = try self.allocator.create(stmt.Block);
+        errdefer self.allocator.destroy(block_ptr);
+
+        switch (block_stmt.*) {
+            .block => |block| {
+                block_ptr.* = block;
+            },
+            else => {
+                self.allocator.destroy(block_ptr);
+                block_stmt.deinit(self.allocator);
+                self.allocator.destroy(block_stmt);
+                return error.ParseError;
+            },
+        }
+
+        const init_ptr = try self.allocator.create(stmt.Let);
+        errdefer self.allocator.destroy(init_ptr);
+
+        switch (init_stmt.?.*) {
+            .let => |let| {
+                init_ptr.* = let;
+            },
+            else => {
+                self.allocator.destroy(init_ptr);
+                if (init_stmt) |stmtt| {
+                    stmtt.deinit(self.allocator);
+                    self.allocator.destroy(stmtt);
+                }
+                return error.ParseError;
+            },
+        }
+
+        const for_stmt = try self.allocator.create(stmt.Statement);
+        for_stmt.* = .{ .for_loop = .{
+            .init = init_ptr,
+            .condition = condition,
+            .increment = increment.?,
+            .body = block_ptr,
+        } };
+
+        self.allocator.destroy(block_stmt);
+        if (init_stmt) |stmtt| {
+            self.allocator.destroy(stmtt);
+        }
+
+        return for_stmt;
+    }
+
+    fn parseAssignment(p: *Parser) ParseError!*stmt.Statement {
+        const ident_lex = p.lexer.next();
+
+        if (ident_lex != .ident) {
+            std.log.err("expected identifier for assignment, got {any}", .{ident_lex});
+            return error.ExpectedIdentifier;
+        }
+
+        const var_name = ident_lex.ident;
+        const name_copy = try p.allocator.dupe(u8, var_name);
+
+        const equal_lex = p.lexer.next();
+        if (equal_lex != .assign) {
+            std.log.err("expected '=' after variable name, got {any}", .{equal_lex});
+            p.allocator.free(name_copy);
+            return error.ExpectedAssignment;
+        }
+
+        const value = try p.parseExpression();
+
+        const assign_stmt = try p.allocator.create(stmt.Statement);
+        assign_stmt.* = stmt.Statement{
+            .assignment = .{
+                .name = name_copy,
+                .value = value,
+            },
+        };
+
+        return assign_stmt;
     }
 };

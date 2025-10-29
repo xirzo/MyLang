@@ -27,6 +27,18 @@ pub fn executeStatement(statement: *stmt.Statement, program: *prog.Program) Exec
         },
         .ret => |*ret| try executeReturn(ret, program),
         .if_cond => |*if_cond| try executeIf(if_cond, program),
+        .while_loop => |*while_loop| try executeWhile(while_loop, program),
+        .assignment => |*assign_stmt| {
+            if (!program.environment.contains(assign_stmt.name)) {
+                std.log.err("undefined variable: {s}", .{assign_stmt.name});
+                return error.UndefinedVariable;
+            }
+
+            const value = try program.evaluator.evaluate(assign_stmt.value);
+
+            try program.environment.put(assign_stmt.name, value);
+        },
+        .for_loop => |*foor_loop| try executeForLoop(foor_loop, program),
     }
 }
 
@@ -65,6 +77,76 @@ fn executeIf(if_stmt: *stmt.If, program: *prog.Program) ExecutionError!void {
     }
 
     try executeBlock(if_stmt.body, program);
+}
+
+fn executeWhile(while_loop: *stmt.While, program: *prog.Program) ExecutionError!void {
+    while (true) {
+        const value = try program.evaluator.evaluate(while_loop.condition);
+
+        const should_execute = switch (value) {
+            .number => |n| n > 0,
+            .string => |str| str.len > 0,
+            .char => |c| c > 0,
+            .boolean => |b| b == true,
+            .none => false,
+            .array => |arr| arr.items.len > 0,
+            .object => true,
+        };
+
+        if (!should_execute) {
+            break;
+        }
+
+        try executeBlock(while_loop.body, program);
+
+        if (program.should_return) {
+            return;
+        }
+    }
+}
+
+pub fn executeForLoop(for_loop: *stmt.For, program: *prog.Program) ExecutionError!void {
+    const original_env_count = program.environment.count();
+
+    try executeStatement(@ptrCast(for_loop.init), program);
+
+    while (true) {
+        const condition_value = try program.evaluator.evaluate(for_loop.condition);
+
+        const should_continue = switch (condition_value) {
+            .number => |n| n > 0,
+            .string => |str| str.len > 0,
+            .char => |c| c > 0,
+            .boolean => |b| b == true,
+            .none => false,
+            .array => |arr| arr.items.len > 0,
+            .object => true,
+        };
+
+        if (!should_continue) {
+            break;
+        }
+
+        try executeBlock(for_loop.body, program);
+
+        if (program.should_return) {
+            return;
+        }
+
+        try executeStatement(for_loop.increment, program);
+    }
+
+    var env_iter = program.environment.iterator();
+    var keys_to_remove = std.array_list.Managed([]const u8).init(program.allocator);
+    defer keys_to_remove.deinit();
+
+    var current_count: usize = 0;
+    while (env_iter.next()) |_| {
+        current_count += 1;
+        if (current_count > original_env_count) {
+            break;
+        }
+    }
 }
 
 fn printValue(writer: *std.fs.File.Writer, value: v.Value) !void {

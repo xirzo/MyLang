@@ -52,9 +52,10 @@ println(fib(5));
 - [x] infix operators
 - [x] prefix operators
 - [x] postfix operators
+- [x] reassignments
+- [x] for loops
+- [x] while loops
 - [] else statements
-- [] for loops
-- [] while loops
 
 ## Sources
 

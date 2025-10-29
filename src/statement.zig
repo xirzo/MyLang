@@ -7,6 +7,12 @@ const ex = @import("executor.zig");
 pub const Let = struct {
     name: []const u8,
     value: *e.Expression,
+
+    pub fn deinit(let_stmt: *Let, allocator: std.mem.Allocator) void {
+        allocator.free(let_stmt.name);
+        let_stmt.value.deinit(allocator);
+        allocator.destroy(let_stmt.value);
+    }
 };
 
 pub const ExpressionStatement = struct {
@@ -72,6 +78,41 @@ pub const If = struct {
     }
 };
 
+pub const While = struct {
+    condition: *e.Expression,
+    body: *Block,
+
+    pub fn deinit(self: *While, allocator: std.mem.Allocator) void {
+        self.condition.deinit(allocator);
+        allocator.destroy(self.condition);
+        self.body.deinit(allocator);
+        allocator.destroy(self.body);
+    }
+};
+
+pub const For = struct {
+    init: *Let,
+    condition: *e.Expression,
+    increment: *Statement,
+    body: *Block,
+
+    pub fn deinit(self: *For, allocator: std.mem.Allocator) void {
+        self.init.deinit(allocator);
+        allocator.destroy(self.init);
+        self.condition.deinit(allocator);
+        allocator.destroy(self.condition);
+        self.increment.deinit(allocator);
+        allocator.destroy(self.increment);
+        self.body.deinit(allocator);
+        allocator.destroy(self.body);
+    }
+};
+
+pub const Assignment = struct {
+    name: []const u8,
+    value: *e.Expression,
+};
+
 pub const Statement = union(enum) {
     let: Let,
     expression: ExpressionStatement,
@@ -80,14 +121,13 @@ pub const Statement = union(enum) {
     builtin_function: BuiltinFunction,
     ret: Return,
     if_cond: If,
+    while_loop: While,
+    for_loop: For,
+    assignment: Assignment,
 
     pub fn deinit(self: *Statement, allocator: std.mem.Allocator) void {
         switch (self.*) {
-            .let => |*let_stmt| {
-                allocator.free(let_stmt.name);
-                let_stmt.value.deinit(allocator);
-                allocator.destroy(let_stmt.value);
-            },
+            .let => |*let_stmt| let_stmt.deinit(allocator),
             .expression => |*expr_stmt| {
                 expr_stmt.expression.deinit(allocator);
                 allocator.destroy(expr_stmt.expression);
@@ -108,6 +148,13 @@ pub const Statement = union(enum) {
                 }
             },
             .if_cond => |*if_cond| if_cond.deinit(allocator),
+            .while_loop => |*while_loop| while_loop.deinit(allocator),
+            .for_loop => |*for_loop| for_loop.deinit(allocator),
+            .assignment => |*assign_stmt| {
+                allocator.free(assign_stmt.name);
+                assign_stmt.value.deinit(allocator);
+                allocator.destroy(assign_stmt.value);
+            },
         }
     }
 };
