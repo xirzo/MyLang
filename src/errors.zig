@@ -18,3 +18,28 @@ pub const EvaluationError = error{
 };
 
 pub const ExecutionError = EvaluationError;
+
+pub const ParseError = error{
+    UnexpectedToken,
+    UnexpectedEOF,
+    MissingClosingBrace,
+    MissingOpeningBrace,
+    MissingClosingParenthesis,
+    MissingOpeningParenthesis,
+    MissingParameter,
+    MissingComma,
+
+    InvalidPrefixOperator,
+    InvalidInfixOperator,
+    InvalidPostfixOperator,
+    BadExpressionLexeme,
+
+    ExpectedIdentifier,
+    ExpectedAssignment,
+    ExpectedSemicolon,
+    ExpectedRParen,
+    ExpectedCommaOrRParen,
+
+    OutOfMemory,
+    ParseError,
+};

@@ -1,27 +1,73 @@
 const std = @import("std");
 const e = @import("expression.zig");
-const ex = @import("executor.zig");
 const v = @import("value.zig");
 const s = @import("statement.zig");
-const prog = @import("program.zig");
+const p = @import("program.zig");
 const errors = @import("errors.zig");
 
 pub const EvaluationError = errors.EvaluationError;
+pub const ExecutionError = errors.ExecutionError;
 
-pub const Evaluator = struct {
-    program: *prog.Program,
-    environment: *std.StringHashMap(v.Value),
-    functions: *std.StringHashMap(*s.FunctionDeclaration),
+pub const Interpreter = struct {
+    allocator: std.mem.Allocator,
+    environment: std.StringHashMap(v.Value),
+    functions: std.StringHashMap(*s.FunctionDeclaration),
+    builtin_functions: std.StringHashMap(*s.BuiltinFunction),
+    ret_value: *v.Value,
+    should_return: bool,
 
-    pub fn init(program: *prog.Program, environment: *std.StringHashMap(v.Value), functions: *std.StringHashMap(*s.FunctionDeclaration)) Evaluator {
-        return Evaluator{
-            .program = program,
-            .environment = environment,
-            .functions = functions,
+    pub fn init(allocator: std.mem.Allocator) !Interpreter {
+        const ret_value = try allocator.create(v.Value);
+        ret_value.* = v.Value{ .none = {} };
+
+        var interpreter = Interpreter{
+            .allocator = allocator,
+            .environment = std.StringHashMap(v.Value).init(allocator),
+            .functions = std.StringHashMap(*s.FunctionDeclaration).init(allocator),
+            .builtin_functions = std.StringHashMap(*s.BuiltinFunction).init(allocator),
+            .ret_value = ret_value,
+            .should_return = false,
         };
+
+        try interpreter.registerBuiltins();
+
+        return interpreter;
     }
 
-    pub fn evaluate(self: *Evaluator, expr: *e.Expression) EvaluationError!v.Value {
+    pub fn deinit(self: *Interpreter) void {
+        var env_iter = self.environment.iterator();
+
+        while (env_iter.next()) |entry| {
+            var value = entry.value_ptr;
+            value.deinit(self.allocator);
+        }
+
+        var builtins_iter = self.builtin_functions.iterator();
+
+        while (builtins_iter.next()) |entry| {
+            self.allocator.free(entry.value_ptr.*.name);
+            self.allocator.destroy(entry.value_ptr.*);
+        }
+
+        self.allocator.destroy(self.ret_value);
+
+        self.environment.deinit();
+        self.functions.deinit();
+        self.builtin_functions.deinit();
+    }
+
+    fn registerBuiltins(self: *Interpreter) !void {
+        const println_fn = try self.allocator.create(s.BuiltinFunction);
+
+        println_fn.* = .{
+            .name = try self.allocator.dupe(u8, "println"),
+            .executor = printlnExecutor,
+        };
+
+        try self.builtin_functions.put("println", println_fn);
+    }
+
+    pub fn evaluate(self: *Interpreter, expr: *e.Expression) EvaluationError!v.Value {
         return switch (expr.*) {
             .constant => |constant| self.evaluateConstant(constant),
             .variable => |vrbl| self.evaluateVariable(vrbl),
@@ -32,7 +78,7 @@ pub const Evaluator = struct {
         };
     }
 
-    fn evaluateConstant(self: *Evaluator, constant: e.Constant) EvaluationError!v.Value {
+    fn evaluateConstant(self: *Interpreter, constant: e.Constant) EvaluationError!v.Value {
         return switch (constant) {
             .number => |num| v.Value{ .number = num },
             .string => |str| v.Value{ .string = str },
@@ -43,8 +89,8 @@ pub const Evaluator = struct {
         };
     }
 
-    fn evaluateArray(self: *Evaluator, arr: std.array_list.Managed(*e.Expression)) EvaluationError!v.Value {
-        var elements = std.array_list.Managed(v.Value).init(self.program.allocator);
+    fn evaluateArray(self: *Interpreter, arr: std.array_list.Managed(*e.Expression)) EvaluationError!v.Value {
+        var elements = std.array_list.Managed(v.Value).init(self.allocator);
 
         for (arr.items) |el| {
             try elements.append(try self.evaluate(el));
@@ -53,11 +99,11 @@ pub const Evaluator = struct {
         return v.Value{ .array = elements };
     }
 
-    fn evaluateVariable(self: *Evaluator, vrbl: e.Variable) EvaluationError!v.Value {
+    fn evaluateVariable(self: *Interpreter, vrbl: e.Variable) EvaluationError!v.Value {
         return self.environment.get(vrbl.name) orelse error.UndefinedVariable;
     }
 
-    fn evaluateBinaryOperator(self: *Evaluator, op: e.BinaryOperator) EvaluationError!v.Value {
+    fn evaluateBinaryOperator(self: *Interpreter, op: e.BinaryOperator) EvaluationError!v.Value {
         const lhs = if (op.lhs) |l| try self.evaluate(l) else {
             return error.NoLeftExpression;
         };
@@ -67,9 +113,9 @@ pub const Evaluator = struct {
         };
 
         return switch (op.value) {
-            '+' => try addValues(self.program.allocator, lhs, rhs),
+            '+' => try addValues(self.allocator, lhs, rhs),
             '-' => try subtractValues(lhs, rhs),
-            '*' => try multiplyValues(self.program.allocator, lhs, rhs),
+            '*' => try multiplyValues(self.allocator, lhs, rhs),
             '/' => try divideValues(lhs, rhs),
             '!' => try factorialValue(lhs),
             '[' => try indexArray(lhs, rhs),
@@ -77,10 +123,10 @@ pub const Evaluator = struct {
         };
     }
 
-    fn evaluateFunctionCall(self: *Evaluator, function_call: *e.FunctionCall) EvaluationError!v.Value {
-        if (self.program.builtins.get(function_call.function_name)) |builtin_ptr| {
+    fn evaluateFunctionCall(self: *Interpreter, function_call: *e.FunctionCall) EvaluationError!v.Value {
+        if (self.builtin_functions.get(function_call.function_name)) |builtin_ptr| {
             const builtin = builtin_ptr.*;
-            var args = std.array_list.Managed(v.Value).init(self.program.allocator);
+            var args = std.array_list.Managed(v.Value).init(self.allocator);
             defer args.deinit();
 
             for (function_call.parameters.items) |param_expr| {
@@ -88,8 +134,8 @@ pub const Evaluator = struct {
                 try args.append(param_value);
             }
 
-            self.program.should_return = false;
-            return builtin.executor(self.program, args.items);
+            self.should_return = false;
+            return builtin.executor(self, args.items);
         }
 
         const func = self.functions.get(function_call.function_name) orelse {
@@ -123,13 +169,13 @@ pub const Evaluator = struct {
             try self.environment.put(func.parameters.items[i], param_value);
         }
 
-        const saved_ret_value = self.program.ret_value.*;
-        self.program.ret_value.* = v.Value{ .none = {} };
-        self.program.should_return = false;
+        const saved_ret_value = self.ret_value.*;
+        self.ret_value.* = v.Value{ .none = {} };
+        self.should_return = false;
 
-        try ex.executeBlock(func.block, self.program);
+        try self.executeBlock(func.block);
 
-        const return_value = self.program.ret_value.*;
+        const return_value = self.ret_value.*;
 
         self.environment.clearRetainingCapacity();
         var saved_iter = saved_vars.iterator();
@@ -137,20 +183,20 @@ pub const Evaluator = struct {
             try self.environment.put(entry.key_ptr.*, entry.value_ptr.*);
         }
 
-        self.program.ret_value.* = saved_ret_value;
+        self.ret_value.* = saved_ret_value;
 
         return return_value;
     }
 
-    fn evaluateComparison(self: *Evaluator, comp: e.ComparisonOperator) EvaluationError!v.Value {
+    fn evaluateComparison(self: *Interpreter, comp: e.ComparisonOperator) EvaluationError!v.Value {
         const lhs = try self.evaluate(comp.lhs);
         const rhs = try self.evaluate(comp.rhs);
 
         return compareValues(lhs, rhs, comp.op);
     }
 
-    fn evaluateObject(self: *Evaluator, obj_fields: std.array_list.Managed(e.ObjectField)) EvaluationError!v.Value {
-        var object = std.StringHashMap(v.Value).init(self.program.allocator);
+    fn evaluateObject(self: *Interpreter, obj_fields: std.array_list.Managed(e.ObjectField)) EvaluationError!v.Value {
+        var object = std.StringHashMap(v.Value).init(self.allocator);
 
         for (obj_fields.items) |field| {
             const value = try self.evaluate(field.value);
@@ -160,7 +206,7 @@ pub const Evaluator = struct {
         return v.Value{ .object = object };
     }
 
-    fn evaluateObjectAccess(self: *Evaluator, obj_access: e.ObjectAccess) EvaluationError!v.Value {
+    fn evaluateObjectAccess(self: *Interpreter, obj_access: e.ObjectAccess) EvaluationError!v.Value {
         const object_value = try self.evaluate(obj_access.object);
 
         const object = switch (object_value) {
@@ -169,6 +215,156 @@ pub const Evaluator = struct {
         };
 
         return object.get(obj_access.key) orelse error.UndefinedProperty;
+    }
+
+    pub fn execute(self: *Interpreter, program: *p.Program) ExecutionError!void {
+        for (program.statements.items) |statement| {
+            try self.executeStatement(statement);
+        }
+    }
+
+    // TODO: make private
+    pub fn executeStatement(self: *Interpreter, statement: *s.Statement) ExecutionError!void {
+        switch (statement.*) {
+            .let => |let_stmt| {
+                const value = try self.evaluate(let_stmt.value);
+                try self.environment.put(let_stmt.name, value);
+            },
+            .expression => |expr_stmt| {
+                _ = try self.evaluate(expr_stmt.expression);
+            },
+            .block => |*block| try executeBlock(self, block),
+            .function_declaration => |*function_declaration| {
+                try self.functions.put(function_declaration.name, function_declaration);
+            },
+            .builtin_function => |_| {
+                // NOTE: this code actually is not needed, as it will never be executed
+                //     const builtin_fn = try program.allocator.create(stmt.BuiltinFunction);
+            },
+            .ret => |*ret| try executeReturn(self, ret),
+            .if_cond => |*if_cond| try executeIf(self, if_cond),
+            .while_loop => |*while_loop| try executeWhile(self, while_loop),
+            .assignment => |*assign_stmt| {
+                if (!self.environment.contains(assign_stmt.name)) {
+                    std.log.err("undefined variable: {s}", .{assign_stmt.name});
+                    return error.UndefinedVariable;
+                }
+
+                const value = try self.evaluate(assign_stmt.value);
+
+                try self.environment.put(assign_stmt.name, value);
+            },
+            .for_loop => |*for_loop| try executeForLoop(self, for_loop),
+        }
+    }
+
+    // TODO: make private
+    pub fn executeBlock(self: *Interpreter, block: *s.Block) ExecutionError!void {
+        for (block.statements.items) |block_statement| {
+            try self.executeStatement(block_statement);
+
+            if (self.should_return) {
+                return;
+            }
+        }
+    }
+
+    fn executeReturn(self: *Interpreter, ret: *s.Return) ExecutionError!void {
+        if (ret.value) |val| {
+            self.ret_value.* = try self.evaluate(val);
+            self.should_return = true;
+        }
+    }
+
+    fn executeIf(self: *Interpreter, if_stmt: *s.If) ExecutionError!void {
+        const value = try self.evaluate(if_stmt.condition);
+
+        const should_execute = switch (value) {
+            .number => |n| n > 0,
+            .string => |str| str.len > 0,
+            .char => |c| c > 0,
+            .boolean => |b| b == true,
+            .none => false,
+            .array => |arr| arr.items.len > 0,
+            .object => true,
+        };
+
+        if (!should_execute) {
+            return;
+        }
+
+        try self.executeBlock(if_stmt.body);
+    }
+
+    fn executeWhile(self: *Interpreter, while_loop: *s.While) ExecutionError!void {
+        while (true) {
+            const value = try self.evaluate(while_loop.condition);
+
+            const should_execute = switch (value) {
+                .number => |n| n > 0,
+                .string => |str| str.len > 0,
+                .char => |c| c > 0,
+                .boolean => |b| b == true,
+                .none => false,
+                .array => |arr| arr.items.len > 0,
+                .object => true,
+            };
+
+            if (!should_execute) {
+                break;
+            }
+
+            try self.executeBlock(while_loop.body);
+
+            if (self.should_return) {
+                return;
+            }
+        }
+    }
+
+    // TODO: make private
+    pub fn executeForLoop(self: *Interpreter, for_loop: *s.For) ExecutionError!void {
+        const original_env_count = self.environment.count();
+
+        try self.executeStatement(@ptrCast(for_loop.init));
+
+        while (true) {
+            const condition_value = try self.evaluate(for_loop.condition);
+
+            const should_continue = switch (condition_value) {
+                .number => |n| n > 0,
+                .string => |str| str.len > 0,
+                .char => |c| c > 0,
+                .boolean => |b| b == true,
+                .none => false,
+                .array => |arr| arr.items.len > 0,
+                .object => true,
+            };
+
+            if (!should_continue) {
+                break;
+            }
+
+            try self.executeBlock(for_loop.body);
+
+            if (self.should_return) {
+                return;
+            }
+
+            try self.executeStatement(for_loop.increment);
+        }
+
+        var env_iter = self.environment.iterator();
+        var keys_to_remove = std.array_list.Managed([]const u8).init(self.allocator);
+        defer keys_to_remove.deinit();
+
+        var current_count: usize = 0;
+        while (env_iter.next()) |_| {
+            current_count += 1;
+            if (current_count > original_env_count) {
+                break;
+            }
+        }
     }
 };
 
@@ -556,4 +752,63 @@ fn indexArray(array_val: v.Value, index_val: v.Value) EvaluationError!v.Value {
     }
 
     return array.items[index];
+}
+
+fn printValue(writer: *std.fs.File.Writer, value: v.Value) !void {
+    switch (value) {
+        .number => |n| try writer.interface.print("{d}", .{n}),
+        .string => |str| try writer.interface.print("{s}", .{str}),
+        .char => |c| try writer.interface.print("{c}", .{c}),
+        .boolean => |b| try writer.interface.print("{}", .{b}),
+        .array => |arr| {
+            try writer.interface.print("[", .{});
+            for (arr.items, 0..) |item, i| {
+                if (i > 0) {
+                    try writer.interface.print(", ", .{});
+                }
+
+                try printValue(writer, item);
+            }
+            try writer.interface.print("]", .{});
+        },
+        .object => |obj| {
+            try writer.interface.print("{{", .{});
+
+            var iterator = obj.iterator();
+            var first = true;
+
+            while (iterator.next()) |entry| {
+                if (!first) {
+                    try writer.interface.print(", ", .{});
+                }
+                first = false;
+
+                try writer.interface.print("{s}: ", .{entry.key_ptr.*});
+
+                try printValue(writer, entry.value_ptr.*);
+            }
+
+            try writer.interface.print("}}", .{});
+        },
+        .none => try writer.interface.print("(none)", .{}),
+    }
+}
+
+// TODO: make private
+fn printlnExecutor(self: *Interpreter, args: []const v.Value) ExecutionError!v.Value {
+    _ = self;
+
+    var buf: [1024]u8 = undefined;
+    var writer = std.fs.File.writer(std.fs.File.stdout(), &buf);
+
+    if (args.len == 0) {
+        try writer.interface.print("\n", .{});
+    } else {
+        try printValue(&writer, args[0]);
+        try writer.interface.print("\n", .{});
+    }
+
+    try writer.interface.flush();
+
+    return v.Value{ .none = {} };
 }

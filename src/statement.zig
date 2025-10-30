@@ -1,8 +1,9 @@
 const std = @import("std");
 const e = @import("expression.zig");
 const v = @import("value.zig");
+const i = @import("interpreter.zig");
 const prog = @import("program.zig");
-const ex = @import("executor.zig");
+const errors = @import("errors.zig");
 
 pub const Let = struct {
     name: []const u8,
@@ -47,7 +48,7 @@ pub const Return = struct {
 
 pub const BuiltinFunction = struct {
     name: []const u8,
-    executor: *const fn (program: *prog.Program, args: []const v.Value) ex.ExecutionError!v.Value,
+    executor: *const fn (program: *i.Interpreter, args: []const v.Value) errors.ExecutionError!v.Value,
 };
 
 pub const FunctionDeclaration = struct {
