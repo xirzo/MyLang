@@ -22,8 +22,4 @@ pub const Program = struct {
 
         self.statements.deinit();
     }
-
-    // pub fn getFunction(self: *Program, name: []const u8) ?*stmt.FunctionDeclaration {
-    //     return self.functions.get(name);
-    // }
 };

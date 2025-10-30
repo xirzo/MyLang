@@ -1,26 +1,25 @@
 const std = @import("std");
-const lex = @import("lexer.zig");
+const l = @import("lexer.zig");
 const v = @import("value.zig");
 const e = @import("expression.zig");
-const pg = @import("program.zig");
+const p = @import("program.zig");
 const s = @import("statement.zig");
 const errors = @import("errors.zig");
-const assert = std.debug.assert;
 
 pub const Parser = struct {
     allocator: std.mem.Allocator,
-    lexer: lex.Lexer,
+    lexer: l.Lexer,
 
-    pub fn init(allocator: std.mem.Allocator, lexer: lex.Lexer) Parser {
+    pub fn init(allocator: std.mem.Allocator, lexer: l.Lexer) Parser {
         return Parser{
             .allocator = allocator,
             .lexer = lexer,
         };
     }
 
-    pub fn parse(self: *Parser) errors.ParseError!*pg.Program {
-        var program = try self.allocator.create(pg.Program);
-        program.* = try pg.Program.init(self.allocator);
+    pub fn parse(self: *Parser) errors.ParseError!*p.Program {
+        var program = try self.allocator.create(p.Program);
+        program.* = try p.Program.init(self.allocator);
 
         while (true) {
             const tok = self.lexer.peek();
@@ -71,7 +70,7 @@ pub const Parser = struct {
         };
     }
 
-    fn comparisonBindingPower(lexem: lex.Lexeme) ?struct { u8, u8 } {
+    fn comparisonBindingPower(lexem: l.Lexeme) ?struct { u8, u8 } {
         return switch (lexem) {
             .eq, .noteq, .greater, .greatereq, .less, .lesseq => .{ 2, 3 },
             else => null,
@@ -88,7 +87,7 @@ pub const Parser = struct {
     }
 
     fn expression(self: *Parser, min_binding_power: u8) errors.ParseError!*e.Expression {
-        const lex_item: lex.Lexeme = self.lexer.next();
+        const lex_item: l.Lexeme = self.lexer.next();
 
         var lhs: *e.Expression = switch (lex_item) {
             .number => |num| blk: {
@@ -160,7 +159,7 @@ pub const Parser = struct {
             },
             .lparen => blk: {
                 const lhs_expr = try self.expression(0);
-                assert(self.lexer.next() == .rparen);
+                std.debug.assert(self.lexer.next() == .rparen);
                 break :blk lhs_expr;
             },
             .sq_lbracket => blk: {
@@ -176,7 +175,7 @@ pub const Parser = struct {
                     }
                 }
 
-                assert(self.lexer.next() == .sq_rbracket);
+                std.debug.assert(self.lexer.next() == .sq_rbracket);
 
                 const node = try self.allocator.create(e.Expression);
                 node.* = e.Expression{ .constant = .{ .array = elements } };
@@ -243,7 +242,7 @@ pub const Parser = struct {
                     }
                 }
 
-                assert(self.lexer.next() == .rbrace);
+                std.debug.assert(self.lexer.next() == .rbrace);
 
                 const node = try self.allocator.create(e.Expression);
                 node.* = e.Expression{ .constant = .{ .object = object_fields } };
@@ -269,7 +268,7 @@ pub const Parser = struct {
         };
 
         while (true) {
-            const oper_lex: lex.Lexeme = self.lexer.peek();
+            const oper_lex: l.Lexeme = self.lexer.peek();
 
             if (oper_lex.getComparisonOp()) |comp_op| {
                 if (comparisonBindingPower(oper_lex)) |bp| {
@@ -318,14 +317,14 @@ pub const Parser = struct {
                     '[' => blk: {
                         const rhs = try self.expression(0);
 
-                        assert(self.lexer.next() == .sq_rbracket);
+                        std.debug.assert(self.lexer.next() == .sq_rbracket);
 
                         break :blk e.Expression{ .binary_operator = .{ .lhs = lhs, .rhs = rhs, .value = '[' } };
                     },
                     '.' => blk: {
                         const key_token = self.lexer.next();
 
-                        assert(key_token == .ident);
+                        std.debug.assert(key_token == .ident);
 
                         const key = try self.allocator.dupe(u8, key_token.ident);
 

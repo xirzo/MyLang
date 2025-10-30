@@ -1,7 +1,6 @@
 const std = @import("std");
 const e = @import("expression.zig");
 const v = @import("value.zig");
-const i = @import("interpreter.zig");
 const prog = @import("program.zig");
 const errors = @import("errors.zig");
 
@@ -44,11 +43,6 @@ pub const Return = struct {
             allocator.destroy(val);
         }
     }
-};
-
-pub const BuiltinFunction = struct {
-    name: []const u8,
-    executor: *const fn (program: *i.Interpreter, args: []const v.Value) errors.ExecutionError!v.Value,
 };
 
 pub const FunctionDeclaration = struct {
@@ -119,7 +113,6 @@ pub const Statement = union(enum) {
     expression: ExpressionStatement,
     block: Block,
     function_declaration: FunctionDeclaration,
-    builtin_function: BuiltinFunction,
     ret: Return,
     if_cond: If,
     while_loop: While,
@@ -138,9 +131,6 @@ pub const Statement = union(enum) {
             },
             .function_declaration => |*function_declaration| {
                 function_declaration.deinit(allocator);
-            },
-            .builtin_function => |*builtin| {
-                allocator.free(builtin.name);
             },
             .ret => |*ret_stmt| {
                 if (ret_stmt.value) |value| {

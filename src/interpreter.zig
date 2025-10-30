@@ -5,14 +5,16 @@ const s = @import("statement.zig");
 const p = @import("program.zig");
 const errors = @import("errors.zig");
 
-pub const EvaluationError = errors.EvaluationError;
-pub const ExecutionError = errors.ExecutionError;
+pub const BuiltinFunction = struct {
+    name: []const u8,
+    executor: *const fn (program: *Interpreter, args: []const v.Value) errors.ExecutionError!v.Value,
+};
 
 pub const Interpreter = struct {
     allocator: std.mem.Allocator,
     environment: std.StringHashMap(v.Value),
     functions: std.StringHashMap(*s.FunctionDeclaration),
-    builtin_functions: std.StringHashMap(*s.BuiltinFunction),
+    builtin_functions: std.StringHashMap(*BuiltinFunction),
     ret_value: *v.Value,
     should_return: bool,
 
@@ -24,7 +26,7 @@ pub const Interpreter = struct {
             .allocator = allocator,
             .environment = std.StringHashMap(v.Value).init(allocator),
             .functions = std.StringHashMap(*s.FunctionDeclaration).init(allocator),
-            .builtin_functions = std.StringHashMap(*s.BuiltinFunction).init(allocator),
+            .builtin_functions = std.StringHashMap(*BuiltinFunction).init(allocator),
             .ret_value = ret_value,
             .should_return = false,
         };
@@ -57,7 +59,7 @@ pub const Interpreter = struct {
     }
 
     fn registerBuiltins(self: *Interpreter) !void {
-        const println_fn = try self.allocator.create(s.BuiltinFunction);
+        const println_fn = try self.allocator.create(BuiltinFunction);
 
         println_fn.* = .{
             .name = try self.allocator.dupe(u8, "println"),
@@ -67,7 +69,7 @@ pub const Interpreter = struct {
         try self.builtin_functions.put("println", println_fn);
     }
 
-    pub fn evaluate(self: *Interpreter, expr: *e.Expression) EvaluationError!v.Value {
+    pub fn evaluate(self: *Interpreter, expr: *e.Expression) errors.EvaluationError!v.Value {
         return switch (expr.*) {
             .constant => |constant| self.evaluateConstant(constant),
             .variable => |vrbl| self.evaluateVariable(vrbl),
@@ -78,7 +80,7 @@ pub const Interpreter = struct {
         };
     }
 
-    fn evaluateConstant(self: *Interpreter, constant: e.Constant) EvaluationError!v.Value {
+    fn evaluateConstant(self: *Interpreter, constant: e.Constant) errors.EvaluationError!v.Value {
         return switch (constant) {
             .number => |num| v.Value{ .number = num },
             .string => |str| v.Value{ .string = str },
@@ -89,7 +91,7 @@ pub const Interpreter = struct {
         };
     }
 
-    fn evaluateArray(self: *Interpreter, arr: std.array_list.Managed(*e.Expression)) EvaluationError!v.Value {
+    fn evaluateArray(self: *Interpreter, arr: std.array_list.Managed(*e.Expression)) errors.EvaluationError!v.Value {
         var elements = std.array_list.Managed(v.Value).init(self.allocator);
 
         for (arr.items) |el| {
@@ -99,11 +101,11 @@ pub const Interpreter = struct {
         return v.Value{ .array = elements };
     }
 
-    fn evaluateVariable(self: *Interpreter, vrbl: e.Variable) EvaluationError!v.Value {
+    fn evaluateVariable(self: *Interpreter, vrbl: e.Variable) errors.EvaluationError!v.Value {
         return self.environment.get(vrbl.name) orelse error.UndefinedVariable;
     }
 
-    fn evaluateBinaryOperator(self: *Interpreter, op: e.BinaryOperator) EvaluationError!v.Value {
+    fn evaluateBinaryOperator(self: *Interpreter, op: e.BinaryOperator) errors.EvaluationError!v.Value {
         const lhs = if (op.lhs) |l| try self.evaluate(l) else {
             return error.NoLeftExpression;
         };
@@ -123,7 +125,7 @@ pub const Interpreter = struct {
         };
     }
 
-    fn evaluateFunctionCall(self: *Interpreter, function_call: *e.FunctionCall) EvaluationError!v.Value {
+    fn evaluateFunctionCall(self: *Interpreter, function_call: *e.FunctionCall) errors.EvaluationError!v.Value {
         if (self.builtin_functions.get(function_call.function_name)) |builtin_ptr| {
             const builtin = builtin_ptr.*;
             var args = std.array_list.Managed(v.Value).init(self.allocator);
@@ -188,14 +190,14 @@ pub const Interpreter = struct {
         return return_value;
     }
 
-    fn evaluateComparison(self: *Interpreter, comp: e.ComparisonOperator) EvaluationError!v.Value {
+    fn evaluateComparison(self: *Interpreter, comp: e.ComparisonOperator) errors.EvaluationError!v.Value {
         const lhs = try self.evaluate(comp.lhs);
         const rhs = try self.evaluate(comp.rhs);
 
         return compareValues(lhs, rhs, comp.op);
     }
 
-    fn evaluateObject(self: *Interpreter, obj_fields: std.array_list.Managed(e.ObjectField)) EvaluationError!v.Value {
+    fn evaluateObject(self: *Interpreter, obj_fields: std.array_list.Managed(e.ObjectField)) errors.EvaluationError!v.Value {
         var object = std.StringHashMap(v.Value).init(self.allocator);
 
         for (obj_fields.items) |field| {
@@ -206,7 +208,7 @@ pub const Interpreter = struct {
         return v.Value{ .object = object };
     }
 
-    fn evaluateObjectAccess(self: *Interpreter, obj_access: e.ObjectAccess) EvaluationError!v.Value {
+    fn evaluateObjectAccess(self: *Interpreter, obj_access: e.ObjectAccess) errors.EvaluationError!v.Value {
         const object_value = try self.evaluate(obj_access.object);
 
         const object = switch (object_value) {
@@ -217,13 +219,13 @@ pub const Interpreter = struct {
         return object.get(obj_access.key) orelse error.UndefinedProperty;
     }
 
-    pub fn execute(self: *Interpreter, program: *p.Program) ExecutionError!void {
+    pub fn execute(self: *Interpreter, program: *p.Program) errors.ExecutionError!void {
         for (program.statements.items) |statement| {
             try self.executeStatement(statement);
         }
     }
 
-    fn executeStatement(self: *Interpreter, statement: *s.Statement) ExecutionError!void {
+    fn executeStatement(self: *Interpreter, statement: *s.Statement) errors.ExecutionError!void {
         switch (statement.*) {
             .let => |let_stmt| {
                 const value = try self.evaluate(let_stmt.value);
@@ -235,10 +237,6 @@ pub const Interpreter = struct {
             .block => |*block| try executeBlock(self, block),
             .function_declaration => |*function_declaration| {
                 try self.functions.put(function_declaration.name, function_declaration);
-            },
-            .builtin_function => |_| {
-                // NOTE: this code actually is not needed, as it will never be executed
-                //     const builtin_fn = try program.allocator.create(stmt.BuiltinFunction);
             },
             .ret => |*ret| try executeReturn(self, ret),
             .if_cond => |*if_cond| try executeIf(self, if_cond),
@@ -257,7 +255,7 @@ pub const Interpreter = struct {
         }
     }
 
-    fn executeBlock(self: *Interpreter, block: *s.Block) ExecutionError!void {
+    fn executeBlock(self: *Interpreter, block: *s.Block) errors.ExecutionError!void {
         for (block.statements.items) |block_statement| {
             try self.executeStatement(block_statement);
 
@@ -267,14 +265,14 @@ pub const Interpreter = struct {
         }
     }
 
-    fn executeReturn(self: *Interpreter, ret: *s.Return) ExecutionError!void {
+    fn executeReturn(self: *Interpreter, ret: *s.Return) errors.ExecutionError!void {
         if (ret.value) |val| {
             self.ret_value.* = try self.evaluate(val);
             self.should_return = true;
         }
     }
 
-    fn executeIf(self: *Interpreter, if_stmt: *s.If) ExecutionError!void {
+    fn executeIf(self: *Interpreter, if_stmt: *s.If) errors.ExecutionError!void {
         const value = try self.evaluate(if_stmt.condition);
 
         const should_execute = switch (value) {
@@ -294,7 +292,7 @@ pub const Interpreter = struct {
         try self.executeBlock(if_stmt.body);
     }
 
-    fn executeWhile(self: *Interpreter, while_loop: *s.While) ExecutionError!void {
+    fn executeWhile(self: *Interpreter, while_loop: *s.While) errors.ExecutionError!void {
         while (true) {
             const value = try self.evaluate(while_loop.condition);
 
@@ -320,7 +318,7 @@ pub const Interpreter = struct {
         }
     }
 
-    fn executeForLoop(self: *Interpreter, for_loop: *s.For) ExecutionError!void {
+    fn executeForLoop(self: *Interpreter, for_loop: *s.For) errors.ExecutionError!void {
         const original_env_count = self.environment.count();
 
         try self.executeStatement(@ptrCast(for_loop.init));
@@ -377,7 +375,7 @@ fn factorial(n: v.Value) f64 {
     return fact;
 }
 
-fn addValues(allocator: std.mem.Allocator, lhs: v.Value, rhs: v.Value) EvaluationError!v.Value {
+fn addValues(allocator: std.mem.Allocator, lhs: v.Value, rhs: v.Value) errors.EvaluationError!v.Value {
     switch (lhs) {
         .number => |lnum| {
             switch (rhs) {
@@ -563,7 +561,7 @@ fn cloneValue(allocator: std.mem.Allocator, value: v.Value) !v.Value {
     }
 }
 
-fn subtractValues(lhs: v.Value, rhs: v.Value) EvaluationError!v.Value {
+fn subtractValues(lhs: v.Value, rhs: v.Value) errors.EvaluationError!v.Value {
     switch (lhs) {
         .number => |lnum| {
             switch (rhs) {
@@ -575,7 +573,7 @@ fn subtractValues(lhs: v.Value, rhs: v.Value) EvaluationError!v.Value {
     }
 }
 
-fn multiplyValues(allocator: std.mem.Allocator, lhs: v.Value, rhs: v.Value) EvaluationError!v.Value {
+fn multiplyValues(allocator: std.mem.Allocator, lhs: v.Value, rhs: v.Value) errors.EvaluationError!v.Value {
     switch (lhs) {
         .number => |lnum| {
             switch (rhs) {
@@ -626,7 +624,7 @@ fn multiplyValues(allocator: std.mem.Allocator, lhs: v.Value, rhs: v.Value) Eval
     }
 }
 
-fn divideValues(lhs: v.Value, rhs: v.Value) EvaluationError!v.Value {
+fn divideValues(lhs: v.Value, rhs: v.Value) errors.EvaluationError!v.Value {
     switch (lhs) {
         .number => |lnum| {
             switch (rhs) {
@@ -641,7 +639,7 @@ fn divideValues(lhs: v.Value, rhs: v.Value) EvaluationError!v.Value {
     }
 }
 
-fn factorialValue(val: v.Value) EvaluationError!v.Value {
+fn factorialValue(val: v.Value) errors.EvaluationError!v.Value {
     switch (val) {
         .number => |num| {
             if (num < 0 or num != @trunc(num)) return error.InvalidFactorial;
@@ -660,12 +658,13 @@ fn factorialValue(val: v.Value) EvaluationError!v.Value {
     }
 }
 
-fn compareValues(lhs: v.Value, rhs: v.Value, op: []const u8) EvaluationError!v.Value {
+fn compareValues(lhs: v.Value, rhs: v.Value, op: []const u8) errors.EvaluationError!v.Value {
     const result = switch (lhs) {
         .number => |lnum| blk: {
             const rnum = switch (rhs) {
                 .number => |n| n,
                 else => return error.TypeMismatch,
+                // just a variable
             };
 
             // std.debug.print("{d} {s} {d}, {}\n", .{ lnum, op, rnum, lnum <= rnum });
@@ -727,7 +726,7 @@ fn compareValues(lhs: v.Value, rhs: v.Value, op: []const u8) EvaluationError!v.V
     return v.Value{ .boolean = result };
 }
 
-fn indexArray(array_val: v.Value, index_val: v.Value) EvaluationError!v.Value {
+fn indexArray(array_val: v.Value, index_val: v.Value) errors.EvaluationError!v.Value {
     const array = switch (array_val) {
         .array => |arr| arr,
         else => return error.TypeMismatch,
@@ -741,6 +740,7 @@ fn indexArray(array_val: v.Value, index_val: v.Value) EvaluationError!v.Value {
 
             break :blk @as(usize, @intFromFloat(num));
         },
+        // just a variable
         else => return error.TypeMismatch,
     };
 
@@ -791,7 +791,7 @@ fn printValue(writer: *std.fs.File.Writer, value: v.Value) !void {
     }
 }
 
-fn printlnExecutor(self: *Interpreter, args: []const v.Value) ExecutionError!v.Value {
+fn printlnExecutor(self: *Interpreter, args: []const v.Value) errors.ExecutionError!v.Value {
     _ = self;
 
     var buf: [1024]u8 = undefined;
