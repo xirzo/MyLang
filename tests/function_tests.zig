@@ -1,106 +1,208 @@
 const std = @import("std");
 const mylang = @import("mylang");
 
-test "declare an empty function" {
-    const src =
-        \\ fn test() { }
-    ;
+test "evaluate arithmetic program" {
+    const src = "let x = 5 + 5;";
+    const lexer = mylang.Lexer.init(src);
+    var parser = mylang.Parser.init(std.testing.allocator, lexer);
+    const program = try parser.parse();
+    defer {
+        program.deinit();
+        std.testing.allocator.destroy(program);
+    }
+    var interpreter = try mylang.Interpreter.init(std.testing.allocator);
+    defer interpreter.deinit();
 
-    var program = try mylang.createInterpreter(std.testing.allocator, src);
-    defer std.testing.allocator.destroy(program);
-    defer program.deinit();
+    try interpreter.execute(program);
 
-    try program.execute();
-
-    try std.testing.expect(program.getFunction("test") != null);
+    try std.testing.expectEqual(10.0, interpreter.environment.get("x").?.number);
 }
 
-test "declare a function with return statement" {
-    const src =
-        \\ fn test() {
-        \\   ret 5;
-        \\ }
-    ;
+test "evaluate complex arithmetic program" {
+    const src = "let x = 5 + 5 * 2;";
+    const lexer = mylang.Lexer.init(src);
+    var parser = mylang.Parser.init(std.testing.allocator, lexer);
+    const program = try parser.parse();
+    defer {
+        program.deinit();
+        std.testing.allocator.destroy(program);
+    }
+    var interpreter = try mylang.Interpreter.init(std.testing.allocator);
+    defer interpreter.deinit();
 
-    var program = try mylang.createInterpreter(std.testing.allocator, src);
-    defer std.testing.allocator.destroy(program);
-    defer program.deinit();
-
-    try program.execute();
-
-    try std.testing.expect(program.getFunction("test") != null);
+    try interpreter.execute(program);
+    try std.testing.expectEqual(15.0, interpreter.environment.get("x").?.number);
 }
 
-test "call a function with value" {
-    const src =
-        \\ fn test() {
-        \\   ret 5;
-        \\ }
-        \\ let x = test();
-    ;
+test "evaluate parentheses program" {
+    const src = "let x = (5 + 5) * 2;";
+    const lexer = mylang.Lexer.init(src);
+    var parser = mylang.Parser.init(std.testing.allocator, lexer);
+    const program = try parser.parse();
+    defer {
+        program.deinit();
+        std.testing.allocator.destroy(program);
+    }
+    var interpreter = try mylang.Interpreter.init(std.testing.allocator);
+    defer interpreter.deinit();
 
-    var program = try mylang.createInterpreter(std.testing.allocator, src);
-    defer std.testing.allocator.destroy(program);
-    defer program.deinit();
-
-    try program.execute();
-
-    const value = program.environment.get("x") orelse {
-        std.log.debug("Variable 'x' not found in environment\n", .{});
-        return error.TestExpectedEqual;
-    };
-
-    try std.testing.expectEqual(value.number, 5.0);
+    try interpreter.execute(program);
+    try std.testing.expectEqual(20.0, interpreter.environment.get("x").?.number);
 }
 
-test "double ret function" {
-    const src =
-        \\ fn test(x) {
-        \\ if x < 0 {
-        \\   ret 0;
-        \\ }
-        \\   ret 1;
-        \\ }
-        \\ let x = test(2);
-    ;
+test "evaluate substraction" {
+    const src = "let x = 0 - 5;";
+    const lexer = mylang.Lexer.init(src);
+    var parser = mylang.Parser.init(std.testing.allocator, lexer);
+    const program = try parser.parse();
+    defer {
+        program.deinit();
+        std.testing.allocator.destroy(program);
+    }
+    var interpreter = try mylang.Interpreter.init(std.testing.allocator);
+    defer interpreter.deinit();
 
-    var program = try mylang.createInterpreter(std.testing.allocator, src);
-    defer std.testing.allocator.destroy(program);
-    defer program.deinit();
-
-    try program.execute();
-
-    const value = program.environment.get("x") orelse {
-        std.log.debug("Variable 'x' not found in environment\n", .{});
-        return error.TestExpectedEqual;
-    };
-
-    try std.testing.expectEqual(value.number, 1.0);
+    try interpreter.execute(program);
+    try std.testing.expectEqual(-5.0, interpreter.environment.get("x").?.number);
 }
 
-test "count fibonacci sequence" {
+test "evaluate array ith element" {
+    const src = "let x = [1, 2, 3];";
+    const lexer = mylang.Lexer.init(src);
+    var parser = mylang.Parser.init(std.testing.allocator, lexer);
+    const program = try parser.parse();
+    defer {
+        program.deinit();
+        std.testing.allocator.destroy(program);
+    }
+    var interpreter = try mylang.Interpreter.init(std.testing.allocator);
+    defer interpreter.deinit();
+
+    try interpreter.execute(program);
+    try std.testing.expectEqual(1.0, interpreter.environment.get("x").?.array.items[0].number);
+}
+
+test "evaluate arrays concat" {
     const src =
-        \\ fn fib(n) {
-        \\     if n <= 1 {
-        \\         ret n;
-        \\     }
+        \\ let x = [1, 2, 3];
+        \\ let y = [4, 5, 6];
+        \\ let z = x + y;
+    ;
+    const lexer = mylang.Lexer.init(src);
+    var parser = mylang.Parser.init(std.testing.allocator, lexer);
+    const program = try parser.parse();
+    defer {
+        program.deinit();
+        std.testing.allocator.destroy(program);
+    }
+    var interpreter = try mylang.Interpreter.init(std.testing.allocator);
+    defer interpreter.deinit();
+
+    try interpreter.execute(program);
+    try std.testing.expectEqual(6, interpreter.environment.get("z").?.array.items.len);
+}
+
+test "evaluate object" {
+    const src =
+        \\ let x = {
+        \\   a = 1,
+        \\   b = 2,
+        \\   c = 3
+        \\ };
+    ;
+    const lexer = mylang.Lexer.init(src);
+    var parser = mylang.Parser.init(std.testing.allocator, lexer);
+    const program = try parser.parse();
+    defer {
+        program.deinit();
+        std.testing.allocator.destroy(program);
+    }
+    var interpreter = try mylang.Interpreter.init(std.testing.allocator);
+    defer interpreter.deinit();
+
+    try interpreter.execute(program);
+    try std.testing.expect(interpreter.environment.get("x").? == .object);
+}
+
+test "evaluate object item access" {
+    const src =
+        \\ let y = {
+        \\   a = 1,
+        \\   b = 2,
+        \\   c = 3
+        \\ };
         \\
-        \\     ret fib(n-1) + fib(n-2);
-        \\ }
-        \\
-        \\ let x = fib(5);
+        \\ let x = y.a;
     ;
+    const lexer = mylang.Lexer.init(src);
+    var parser = mylang.Parser.init(std.testing.allocator, lexer);
+    const program = try parser.parse();
+    defer {
+        program.deinit();
+        std.testing.allocator.destroy(program);
+    }
+    var interpreter = try mylang.Interpreter.init(std.testing.allocator);
+    defer interpreter.deinit();
 
-    var program = try mylang.createInterpreter(std.testing.allocator, src);
-    defer std.testing.allocator.destroy(program);
-    defer program.deinit();
+    try interpreter.execute(program);
+    try std.testing.expectEqual(1.0, interpreter.environment.get("x").?.number);
+}
 
-    try program.execute();
+test "evaluate while loop" {
+    const src =
+        \\ let x = 0;
+        \\
+        \\ while x < 5 {
+        \\   x = x + 1;
+        \\ }
+    ;
+    const lexer = mylang.Lexer.init(src);
+    var parser = mylang.Parser.init(std.testing.allocator, lexer);
+    const program = try parser.parse();
+    defer {
+        program.deinit();
+        std.testing.allocator.destroy(program);
+    }
+    var interpreter = try mylang.Interpreter.init(std.testing.allocator);
+    defer interpreter.deinit();
 
-    const value = program.environment.get("x") orelse {
-        std.log.debug("Variable 'x' not found in environment\n", .{});
-        return error.TestExpectedEqual;
-    };
+    try interpreter.execute(program);
+    try std.testing.expectEqual(5.0, interpreter.environment.get("x").?.number);
+}
 
-    try std.testing.expectEqual(value.number, 5.0);
+test "evaluate for loop" {
+    const src =
+        \\ for let x = 1; x < 5; x = x  + 1 { }
+    ;
+    const lexer = mylang.Lexer.init(src);
+    var parser = mylang.Parser.init(std.testing.allocator, lexer);
+    const program = try parser.parse();
+    defer {
+        program.deinit();
+        std.testing.allocator.destroy(program);
+    }
+    var interpreter = try mylang.Interpreter.init(std.testing.allocator);
+    defer interpreter.deinit();
+
+    try interpreter.execute(program);
+    try std.testing.expectEqual(5.0, interpreter.environment.get("x").?.number);
+}
+
+test "variable reassignment" {
+    const src =
+        \\ let x = 5;
+        \\ x = x + 5;
+    ;
+    const lexer = mylang.Lexer.init(src);
+    var parser = mylang.Parser.init(std.testing.allocator, lexer);
+    const program = try parser.parse();
+    defer {
+        program.deinit();
+        std.testing.allocator.destroy(program);
+    }
+    var interpreter = try mylang.Interpreter.init(std.testing.allocator);
+    defer interpreter.deinit();
+
+    try interpreter.execute(program);
+    try std.testing.expectEqual(10.0, interpreter.environment.get("x").?.number);
 }

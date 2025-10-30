@@ -2,25 +2,6 @@ const std = @import("std");
 const testing = std.testing;
 const mylang = @import("mylang");
 
-fn createParser(allocator: std.mem.Allocator, source: []const u8) mylang.Parser {
-    const lexer = mylang.Lexer.init(source);
-    return mylang.Parser.init(lexer, allocator);
-}
-
-fn expectExpressionType(allocator: std.mem.Allocator, source: []const u8, expected_type: std.meta.Tag(mylang.Expression)) !*mylang.Expression {
-    var parser = createParser(allocator, source);
-    const expr = try parser.parseExpression();
-    try testing.expect(@as(std.meta.Tag(mylang.Expression), expr.*) == expected_type);
-    return expr;
-}
-
-fn expectStatementType(allocator: std.mem.Allocator, source: []const u8, expected_type: std.meta.Tag(mylang.Statement)) !*mylang.Statement {
-    var parser = createParser(allocator, source);
-    const statement = (try parser.parseStatement()).?;
-    try testing.expect(@as(std.meta.Tag(mylang.Statement), statement.*) == expected_type);
-    return statement;
-}
-
 test "nested function calls in expressions" {
     const src =
         \\fn add(a, b) { ret a + b; }
@@ -28,14 +9,20 @@ test "nested function calls in expressions" {
         \\let result = multiply(add(2, 3), add(4, 5));
     ;
 
-    var program = try mylang.createInterpreter(std.testing.allocator, src);
-    defer std.testing.allocator.destroy(program);
-    defer program.deinit();
+    const lexer = mylang.Lexer.init(src);
+    var parser = mylang.Parser.init(testing.allocator, lexer);
+    const program = try parser.parse();
+    defer {
+        program.deinit();
+        testing.allocator.destroy(program);
+    }
+    var interpreter = try mylang.Interpreter.init(testing.allocator);
+    defer interpreter.deinit();
 
-    try program.execute();
+    try interpreter.execute(program);
 
-    try std.testing.expect(program.getFunction("add") != null);
-    try std.testing.expect(program.getFunction("multiply") != null);
+    try testing.expect(interpreter.functions.get("add") != null);
+    try testing.expect(interpreter.functions.get("multiply") != null);
 
     try testing.expectEqual(@as(usize, 3), program.statements.items.len);
 }
@@ -52,14 +39,20 @@ test "factorial calculation" {
         \\let result = factorial(2);
     ;
 
-    var program = try mylang.createInterpreter(std.testing.allocator, src);
-    defer std.testing.allocator.destroy(program);
-    defer program.deinit();
+    const lexer = mylang.Lexer.init(src);
+    var parser = mylang.Parser.init(testing.allocator, lexer);
+    const program = try parser.parse();
+    defer {
+        program.deinit();
+        testing.allocator.destroy(program);
+    }
+    var interpreter = try mylang.Interpreter.init(testing.allocator);
+    defer interpreter.deinit();
 
-    try program.execute();
+    try interpreter.execute(program);
 
-    const func = program.getFunction("factorial");
-    try std.testing.expect(func != null);
+    const func = interpreter.functions.get("factorial");
+    try testing.expect(func != null);
     try testing.expectEqualStrings("factorial", func.?.name);
     try testing.expectEqual(@as(usize, 1), func.?.parameters.items.len);
     try testing.expectEqual(@as(usize, 2), program.statements.items.len);
@@ -67,13 +60,17 @@ test "factorial calculation" {
 
 test "parse complex nested expression" {
     const allocator = testing.allocator;
+    const src = "(a + b) * (c - d) / 2;";
 
-    var parser = createParser(allocator, "(a + b) * (c - d) / 2");
-    const expr = try parser.parseExpression();
+    const lexer = mylang.Lexer.init(src);
+    var parser = mylang.Parser.init(allocator, lexer);
+    const program = try parser.parse();
     defer {
-        expr.deinit(allocator);
-        allocator.destroy(expr);
+        program.deinit();
+        allocator.destroy(program);
     }
+
+    const expr = program.statements.items[0].expression.expression;
 
     try testing.expect(expr.* == .binary_operator);
     try testing.expectEqual(@as(u8, '/'), expr.binary_operator.value);
@@ -85,7 +82,7 @@ test "parse complex nested expression" {
     try testing.expectEqual(@as(f64, 2), expr.binary_operator.rhs.?.constant.number);
 }
 
-// FREEZES
+//FIX: FREEZES
 // test "parse program with mixed statements" {
 //     const src =
 //         \\let x = 10;
@@ -97,11 +94,17 @@ test "parse complex nested expression" {
 //         \\}
 //     ;
 //
-//     var program = try mylang.createInterpreter(std.testing.allocator, src);
-//     defer std.testing.allocator.destroy(program);
-//     defer program.deinit();
+//     const lexer = mylang.Lexer.init(src);
+//     var parser = mylang.Parser.init(testing.allocator, lexer);
+//     const program = try parser.parse();
+//     defer {
+//         program.deinit();
+//         testing.allocator.destroy(program);
+//     }
+//     var interpreter = try mylang.Interpreter.init(testing.allocator);
+//     defer interpreter.deinit();
 //
-//     try program.execute();
+//     try interpreter.execute(program);
 //
 //     try testing.expectEqual(@as(usize, 3), program.statements.items.len);
 //
@@ -116,35 +119,138 @@ test "parse complex nested expression" {
 
 // test "parse error - unexpected token" {
 //     const allocator = testing.allocator;
+//     const src = "let + 5;";
 //
-//     var parser = createParser(allocator, "let + 5");
-//     try testing.expectError(mylang.ParseError.ExpectedIdentifier, parser.parseStatement());
+//     const lexer = mylang.Lexer.init(src);
+//     var parser = mylang.Parser.init(allocator, lexer);
+//
+//     try testing.expectError(mylang.ParseError.ExpectedIdentifier, parser.parse());
 // }
 //
 // test "parse error - missing assignment" {
 //     const allocator = testing.allocator;
+//     const src = "let x 5;";
 //
-//     var parser = createParser(allocator, "let x 5");
-//     try testing.expectError(mylang.ParseError.ExpectedAssignment, parser.parseStatement());
+//     const lexer = mylang.Lexer.init(src);
+//     var parser = mylang.Parser.init(allocator, lexer);
+//
+//     try testing.expectError(mylang.ParseError.ExpectedAssignment, parser.parse());
 // }
 //
 // test "parse error - missing closing brace" {
 //     const allocator = testing.allocator;
+//     const src = "{ let x = 5;";
 //
-//     var parser = createParser(allocator, "{ let x = 5;");
-//     try testing.expectError(mylang.ParseError.UnexpectedEOF, parser.parseStatement());
+//     const lexer = mylang.Lexer.init(src);
+//     var parser = mylang.Parser.init(allocator, lexer);
+//
+//     try testing.expectError(mylang.ParseError.UnexpectedEOF, parser.parse());
 // }
 //
 // test "parse error - missing closing parenthesis in function call" {
 //     const allocator = testing.allocator;
+//     const src = "println(42;";
 //
-//     var parser = createParser(allocator, "println(42");
-//     try testing.expectError(mylang.ParseError.ExpectedCommaOrRParen, parser.parseExpression());
+//     const lexer = mylang.Lexer.init(src);
+//     var parser = mylang.Parser.init(allocator, lexer);
+//
+//     try testing.expectError(mylang.ParseError.ExpectedCommaOrRParen, parser.parse());
 // }
 //
 // test "parse error - invalid prefix operator" {
 //     const allocator = testing.allocator;
+//     const src = "* 5;";
 //
-//     var parser = createParser(allocator, "* 5");
-//     try testing.expectError(mylang.ParseError.ParseError, parser.parseExpression());
+//     const lexer = mylang.Lexer.init(src);
+//     var parser = mylang.Parser.init(allocator, lexer);
+//
+//     try testing.expectError(mylang.ParseError.ParseError, parser.parse());
 // }
+
+test "parse array with nested expressions" {
+    const allocator = testing.allocator;
+    const src = "[1 + 2, 3 * 4, x];";
+
+    const lexer = mylang.Lexer.init(src);
+    var parser = mylang.Parser.init(allocator, lexer);
+    const program = try parser.parse();
+    defer {
+        program.deinit();
+        allocator.destroy(program);
+    }
+
+    const expr = program.statements.items[0].expression.expression;
+    try testing.expect(expr.* == .constant);
+    try testing.expect(expr.constant == .array);
+    try testing.expectEqual(@as(usize, 3), expr.constant.array.items.len);
+
+    try testing.expect(expr.constant.array.items[0].* == .binary_operator);
+    try testing.expectEqual(@as(u8, '+'), expr.constant.array.items[0].binary_operator.value);
+
+    try testing.expect(expr.constant.array.items[1].* == .binary_operator);
+    try testing.expectEqual(@as(u8, '*'), expr.constant.array.items[1].binary_operator.value);
+
+    try testing.expect(expr.constant.array.items[2].* == .variable);
+    try testing.expectEqualStrings("x", expr.constant.array.items[2].variable.name);
+}
+
+test "parse multiple assignment statements" {
+    const allocator = testing.allocator;
+    const src =
+        \\let a = 1;
+        \\let b = 2;
+        \\a = a + b;
+        \\b = a * 2;
+    ;
+
+    const lexer = mylang.Lexer.init(src);
+    var parser = mylang.Parser.init(allocator, lexer);
+    const program = try parser.parse();
+    defer {
+        program.deinit();
+        allocator.destroy(program);
+    }
+
+    try testing.expectEqual(@as(usize, 4), program.statements.items.len);
+
+    // First two should be let statements
+    try testing.expect(program.statements.items[0].* == .let);
+    try testing.expectEqualStrings("a", program.statements.items[0].let.name);
+
+    try testing.expect(program.statements.items[1].* == .let);
+    try testing.expectEqualStrings("b", program.statements.items[1].let.name);
+
+    // Last two should be assignment statements
+    try testing.expect(program.statements.items[2].* == .assignment);
+    try testing.expectEqualStrings("a", program.statements.items[2].assignment.name);
+
+    try testing.expect(program.statements.items[3].* == .assignment);
+    try testing.expectEqualStrings("b", program.statements.items[3].assignment.name);
+}
+
+test "parse for loop with initialization and increment" {
+    const allocator = testing.allocator;
+    const src = "for let i = 0; i < 10; i = i + 1 { println(i); }";
+
+    const lexer = mylang.Lexer.init(src);
+    var parser = mylang.Parser.init(allocator, lexer);
+    const program = try parser.parse();
+    defer {
+        program.deinit();
+        allocator.destroy(program);
+    }
+
+    try testing.expectEqual(@as(usize, 1), program.statements.items.len);
+    try testing.expect(program.statements.items[0].* == .for_loop);
+
+    const for_stmt = &program.statements.items[0].for_loop;
+
+    try testing.expectEqualStrings("i", for_stmt.init.name);
+
+    try testing.expect(for_stmt.condition.* == .comparison_operator);
+
+    try testing.expect(for_stmt.increment.* == .assignment);
+
+    try testing.expectEqual(@as(usize, 1), for_stmt.body.statements.items.len);
+    try testing.expect(for_stmt.body.statements.items[0].* == .expression);
+}
