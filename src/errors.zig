@@ -15,9 +15,10 @@ pub const EvaluationError = error{
     InvalidIndex,
     IndexOutOfBounds,
     UndefinedProperty,
+    WrongArgumentCount,
 };
 
-pub const ExecutionError = EvaluationError;
+pub const ExecutionError = EvaluationError || error{};
 
 pub const ParseError = error{
     UnexpectedToken,

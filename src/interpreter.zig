@@ -66,7 +66,16 @@ pub const Interpreter = struct {
             .executor = printlnExecutor,
         };
 
-        try self.builtin_functions.put("println", println_fn);
+        try self.builtin_functions.put(println_fn.name, println_fn);
+
+        const strlen_fn = try self.allocator.create(BuiltinFunction);
+
+        strlen_fn.* = .{
+            .name = try self.allocator.dupe(u8, "strlen"),
+            .executor = strlen,
+        };
+
+        try self.builtin_functions.put(strlen_fn.name, strlen_fn);
     }
 
     pub fn evaluate(self: *Interpreter, expr: *e.Expression) errors.EvaluationError!v.Value {
@@ -83,7 +92,11 @@ pub const Interpreter = struct {
     fn evaluateConstant(self: *Interpreter, constant: e.Constant) errors.EvaluationError!v.Value {
         return switch (constant) {
             .number => |num| v.Value{ .number = num },
-            .string => |str| v.Value{ .string = str },
+            .string => |str| blk: {
+                const dupe = try self.allocator.dupe(u8, str);
+                const value = v.Value{ .string = dupe };
+                break :blk value;
+            },
             .char => |ch| v.Value{ .char = ch },
             .boolean => |b| v.Value{ .boolean = b },
             .array => |arr| self.evaluateArray(arr),
@@ -807,4 +820,18 @@ fn printlnExecutor(self: *Interpreter, args: []const v.Value) errors.ExecutionEr
     try writer.interface.flush();
 
     return v.Value{ .none = {} };
+}
+
+fn strlen(self: *Interpreter, args: []const v.Value) errors.ExecutionError!v.Value {
+    _ = self;
+
+    if (args.len != 1) {
+        return error.WrongArgumentCount;
+    }
+
+    if (args[0] != .string) {
+        return error.TypeMismatch;
+    }
+
+    return v.Value{ .number = @as(f64, @floatFromInt(args[0].string.len)) };
 }

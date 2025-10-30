@@ -18,7 +18,7 @@ pub fn execute(allocator: std.mem.Allocator, source: []const u8) !void {
     const program = try parser.parse();
     defer {
         program.deinit();
-        std.testing.allocator.destroy(program);
+        allocator.destroy(program);
     }
 
     var interpreter = try Interpreter.init(allocator);
