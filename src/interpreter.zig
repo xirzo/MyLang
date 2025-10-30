@@ -334,7 +334,7 @@ pub const Interpreter = struct {
     fn executeForLoop(self: *Interpreter, for_loop: *s.For) errors.ExecutionError!void {
         const original_env_count = self.environment.count();
 
-        try self.executeStatement(@ptrCast(for_loop.init));
+        try self.executeStatement(for_loop.init);
 
         while (true) {
             const condition_value = try self.evaluate(for_loop.condition);

@@ -206,3 +206,22 @@ test "variable reassignment" {
     try interpreter.execute(program);
     try std.testing.expectEqual(10.0, interpreter.environment.get("x").?.number);
 }
+
+test "strlen" {
+    const src =
+        \\ let str = "Hello, World!";
+        \\ let x = strlen(str);
+    ;
+    const lexer = mylang.Lexer.init(src);
+    var parser = mylang.Parser.init(std.testing.allocator, lexer);
+    const program = try parser.parse();
+    defer {
+        program.deinit();
+        std.testing.allocator.destroy(program);
+    }
+    var interpreter = try mylang.Interpreter.init(std.testing.allocator);
+    defer interpreter.deinit();
+
+    try interpreter.execute(program);
+    try std.testing.expectEqual(13, interpreter.environment.get("x").?.number);
+}

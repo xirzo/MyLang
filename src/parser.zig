@@ -663,7 +663,7 @@ pub const Parser = struct {
     }
 
     fn parseFor(self: *Parser) errors.ParseError!*s.Statement {
-        _ = self.lexer.next(); // consume 'for'
+        _ = self.lexer.next();
 
         const init_stmt = try self.parseStatement();
         if (init_stmt == null) {
@@ -720,15 +720,14 @@ pub const Parser = struct {
             },
         }
 
-        const init_ptr = try self.allocator.create(s.Let);
-        errdefer self.allocator.destroy(init_ptr);
-
+        // NOTE: allows only let statements, maybe sufficient
+        // to just check for null
         switch (init_stmt.?.*) {
-            .let => |let| {
-                init_ptr.* = let;
-            },
+            .let => {},
             else => {
-                self.allocator.destroy(init_ptr);
+                self.allocator.destroy(block_ptr);
+                block_stmt.deinit(self.allocator);
+                self.allocator.destroy(block_stmt);
                 if (init_stmt) |stmtt| {
                     stmtt.deinit(self.allocator);
                     self.allocator.destroy(stmtt);
@@ -738,18 +737,16 @@ pub const Parser = struct {
         }
 
         const for_stmt = try self.allocator.create(s.Statement);
-        for_stmt.* = .{ .for_loop = .{
-            .init = init_ptr,
-            .condition = condition,
-            .increment = increment.?,
-            .body = block_ptr,
-        } };
+        for_stmt.* = .{
+            .for_loop = .{
+                .init = init_stmt.?,
+                .condition = condition,
+                .increment = increment.?,
+                .body = block_ptr,
+            },
+        };
 
         self.allocator.destroy(block_stmt);
-        if (init_stmt) |stmtt| {
-            self.allocator.destroy(stmtt);
-        }
-
         return for_stmt;
     }
 

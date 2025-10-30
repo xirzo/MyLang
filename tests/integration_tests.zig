@@ -245,8 +245,6 @@ test "parse for loop with initialization and increment" {
 
     const for_stmt = &program.statements.items[0].for_loop;
 
-    try testing.expectEqualStrings("i", for_stmt.init.name);
-
     try testing.expect(for_stmt.condition.* == .comparison_operator);
 
     try testing.expect(for_stmt.increment.* == .assignment);

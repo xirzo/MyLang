@@ -86,7 +86,7 @@ pub const While = struct {
 };
 
 pub const For = struct {
-    init: *Let,
+    init: *Statement,
     condition: *e.Expression,
     increment: *Statement,
     body: *Block,
