@@ -4,9 +4,6 @@ const ev = @import("evaluator.zig");
 const v = @import("value.zig");
 const stmt = @import("statement.zig");
 const exec = @import("executor.zig");
-const errors = @import("errors.zig");
-
-pub const ExecutionError = errors.ExecutionError;
 
 pub const Program = struct {
     allocator: std.mem.Allocator,
@@ -43,21 +40,20 @@ pub const Program = struct {
     }
 
     pub fn deinit(self: *Program) void {
-        std.log.debug("Statements count: {d}\n", .{self.statements.items.len});
-
         for (self.statements.items) |stmt_item| {
             stmt_item.deinit(self.allocator);
             self.allocator.destroy(stmt_item);
-            std.log.debug("Deinited statement\n", .{});
         }
 
         var env_iter = self.environment.iterator();
+
         while (env_iter.next()) |entry| {
             var value = entry.value_ptr;
             value.deinit(self.allocator);
         }
 
         var builtins_iter = self.builtins.iterator();
+
         while (builtins_iter.next()) |entry| {
             self.allocator.free(entry.value_ptr.*.name);
             self.allocator.destroy(entry.value_ptr.*);
@@ -97,22 +93,5 @@ pub const Program = struct {
 
     pub fn getFunction(self: *Program, name: []const u8) ?*stmt.FunctionDeclaration {
         return self.functions.get(name);
-    }
-
-    pub fn printEnvironment(_: *const Program) void {
-        // std.log.debug("Environment state:\n", .{});
-        //
-        // var it = self.environment.iterator();
-        //
-        // while (it.next()) |entry| {
-        //     switch (entry.value_ptr.*) {
-        //         .number => std.log.debug("  {s} = {d}\n", .{ entry.key_ptr.*, entry.value_ptr.* }),
-        //         else => unreachable,
-        //     }
-        // }
-        //
-        // if (self.environment.count() == 0) {
-        //     std.log.debug("  (empty)\n", .{});
-        // }
     }
 };

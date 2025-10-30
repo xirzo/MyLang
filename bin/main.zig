@@ -24,6 +24,7 @@ pub fn main() !void {
 
     var input_buffer: [1024]u8 = undefined;
     var reader = file.reader(&input_buffer);
+
     reader.interface.readSliceAll(&input_buffer) catch |err| switch (err) {
         error.ReadFailed => unreachable,
         error.EndOfStream => {},
@@ -33,6 +34,4 @@ pub fn main() !void {
     defer program.deinit();
 
     try program.execute();
-
-    program.printEnvironment();
 }
