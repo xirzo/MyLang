@@ -1,0 +1,6 @@
+
+let str = "Hello, World";
+
+for let i = 0; i < strlen(str); i = i + 1 {
+    println(str[i]);
+}

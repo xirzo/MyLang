@@ -225,3 +225,22 @@ test "strlen" {
     try interpreter.execute(program);
     try std.testing.expectEqual(13, interpreter.environment.get("x").?.number);
 }
+
+test "get ith char of string" {
+    const src =
+        \\ let str = "Hello, World!";
+        \\ let x = str[5];
+    ;
+    const lexer = mylang.Lexer.init(src);
+    var parser = mylang.Parser.init(std.testing.allocator, lexer);
+    const program = try parser.parse();
+    defer {
+        program.deinit();
+        std.testing.allocator.destroy(program);
+    }
+    var interpreter = try mylang.Interpreter.init(std.testing.allocator);
+    defer interpreter.deinit();
+
+    try interpreter.execute(program);
+    try std.testing.expectEqual(',', interpreter.environment.get("x").?.char);
+}

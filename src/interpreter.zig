@@ -740,11 +740,6 @@ fn compareValues(lhs: v.Value, rhs: v.Value, op: []const u8) errors.EvaluationEr
 }
 
 fn indexArray(array_val: v.Value, index_val: v.Value) errors.EvaluationError!v.Value {
-    const array = switch (array_val) {
-        .array => |arr| arr,
-        else => return error.TypeMismatch,
-    };
-
     const index = switch (index_val) {
         .number => |num| blk: {
             if (num < 0 or num != @trunc(num)) {
@@ -753,15 +748,26 @@ fn indexArray(array_val: v.Value, index_val: v.Value) errors.EvaluationError!v.V
 
             break :blk @as(usize, @intFromFloat(num));
         },
-        // just a variable
         else => return error.TypeMismatch,
     };
 
-    if (index >= array.items.len) {
-        return error.IndexOutOfBounds;
-    }
+    return switch (array_val) {
+        .array => |arr| blk: {
+            if (index >= arr.items.len) {
+                return error.IndexOutOfBounds;
+            }
 
-    return array.items[index];
+            break :blk arr.items[index];
+        },
+        .string => |str| blk: {
+            if (index >= str.len) {
+                return error.IndexOutOfBounds;
+            }
+
+            break :blk v.Value{ .char = str[index] };
+        },
+        else => return error.TypeMismatch,
+    };
 }
 
 fn printValue(writer: *std.fs.File.Writer, value: v.Value) !void {
