@@ -12,9 +12,14 @@ pub const Statement = @import("statement.zig").Statement;
 pub const Program = @import("program.zig").Program;
 pub const Value = @import("value.zig").Value;
 
-// TODO: rename or add interpreter
-pub fn createInterpreter(allocator: std.mem.Allocator, source: []const u8) !*Program {
+pub fn execute(allocator: std.mem.Allocator, source: []const u8) !void {
     const lexer = Lexer.init(source);
-    var parser = Parser.init(lexer, allocator);
-    return try parser.parse();
+    var parser = Parser.init(allocator, lexer);
+    const program = try parser.parse();
+    defer program.deinit();
+
+    var interpreter = try Interpreter.init(allocator);
+    defer interpreter.deinit();
+
+    try interpreter.execute(program);
 }

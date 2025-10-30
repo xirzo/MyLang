@@ -11,10 +11,10 @@ pub const Parser = struct {
     allocator: std.mem.Allocator,
     lexer: lex.Lexer,
 
-    pub fn init(allocator: std.mem.Allocator, l: lex.Lexer) Parser {
+    pub fn init(allocator: std.mem.Allocator, lexer: lex.Lexer) Parser {
         return Parser{
             .allocator = allocator,
-            .lexer = l,
+            .lexer = lexer,
         };
     }
 
@@ -51,8 +51,7 @@ pub const Parser = struct {
         return program;
     }
 
-    // TODO: make private
-    pub fn parseExpression(parser: *Parser) !*e.Expression {
+    fn parseExpression(parser: *Parser) !*e.Expression {
         return try parser.expression(0);
     }
 
@@ -114,7 +113,6 @@ pub const Parser = struct {
             },
             .ident => |name| blk: {
                 if (!self.lexer.checkToken(.lparen)) {
-                    // just a variable
                     const name_copy = try self.allocator.dupe(u8, name);
                     const expr_node: *e.Expression = try self.allocator.create(e.Expression);
                     expr_node.* = e.Expression{ .variable = .{ .name = name_copy } };
@@ -371,8 +369,7 @@ pub const Parser = struct {
         return lhs;
     }
 
-    // TODO: make private
-    pub fn parseStatement(self: *Parser) errors.ParseError!?*s.Statement {
+    fn parseStatement(self: *Parser) errors.ParseError!?*s.Statement {
         const tok = self.lexer.peek();
 
         std.log.debug("got lexeme: {s}\n", .{@tagName(tok)});

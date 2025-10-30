@@ -30,13 +30,5 @@ pub fn main() !void {
         error.EndOfStream => {},
     };
 
-    const lexer = mylang.Lexer.init(&input_buffer);
-    var parser = mylang.Parser.init(allocator, lexer);
-    const program = try parser.parse();
-    defer program.deinit();
-
-    var interpreter = try mylang.Interpreter.init(allocator);
-    defer interpreter.deinit();
-
-    try interpreter.execute(program);
+    try mylang.execute(allocator, &input_buffer);
 }

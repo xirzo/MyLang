@@ -223,8 +223,7 @@ pub const Interpreter = struct {
         }
     }
 
-    // TODO: make private
-    pub fn executeStatement(self: *Interpreter, statement: *s.Statement) ExecutionError!void {
+    fn executeStatement(self: *Interpreter, statement: *s.Statement) ExecutionError!void {
         switch (statement.*) {
             .let => |let_stmt| {
                 const value = try self.evaluate(let_stmt.value);
@@ -258,8 +257,7 @@ pub const Interpreter = struct {
         }
     }
 
-    // TODO: make private
-    pub fn executeBlock(self: *Interpreter, block: *s.Block) ExecutionError!void {
+    fn executeBlock(self: *Interpreter, block: *s.Block) ExecutionError!void {
         for (block.statements.items) |block_statement| {
             try self.executeStatement(block_statement);
 
@@ -322,8 +320,7 @@ pub const Interpreter = struct {
         }
     }
 
-    // TODO: make private
-    pub fn executeForLoop(self: *Interpreter, for_loop: *s.For) ExecutionError!void {
+    fn executeForLoop(self: *Interpreter, for_loop: *s.For) ExecutionError!void {
         const original_env_count = self.environment.count();
 
         try self.executeStatement(@ptrCast(for_loop.init));
@@ -794,7 +791,6 @@ fn printValue(writer: *std.fs.File.Writer, value: v.Value) !void {
     }
 }
 
-// TODO: make private
 fn printlnExecutor(self: *Interpreter, args: []const v.Value) ExecutionError!v.Value {
     _ = self;
 
